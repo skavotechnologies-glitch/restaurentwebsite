@@ -1,0 +1,167 @@
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
+
+const CartContext = createContext(null);
+
+export function CartProvider({ children }) {
+  const [cartItems, setCartItems] = useState(() => {
+    const saved = localStorage.getItem('qr_restaurant_cart');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [tableInfo, setTableInfo] = useState(() => {
+    const saved = localStorage.getItem('qr_restaurant_table');
+    return saved ? JSON.parse(saved) : null;
+  });
+
+  const [customerInfo, setCustomerInfo] = useState(() => {
+    const saved = localStorage.getItem('qr_restaurant_customer');
+    return saved ? JSON.parse(saved) : { name: '', phone: '', instructions: '' };
+  });
+
+  useEffect(() => {
+    localStorage.setItem('qr_restaurant_cart', JSON.stringify(cartItems));
+  }, [cartItems]);
+
+  useEffect(() => {
+    if (tableInfo) {
+      localStorage.setItem('qr_restaurant_table', JSON.stringify(tableInfo));
+    }
+  }, [tableInfo]);
+
+  useEffect(() => {
+    localStorage.setItem('qr_restaurant_customer', JSON.stringify(customerInfo));
+  }, [customerInfo]);
+
+  const addToCart = (menuItem, quantity = 1, specialInstructions = '') => {
+    if (!menuItem.isAvailable) return false;
+
+    setCartItems(prev => {
+      const existingIndex = prev.findIndex(item => item.id === menuItem.id);
+      if (existingIndex > -1) {
+        const updated = [...prev];
+        const existing = updated[existingIndex];
+        updated[existingIndex] = {
+          ...existing,
+          quantity: existing.quantity + quantity,
+          specialInstructions: specialInstructions || existing.specialInstructions
+        };
+        return updated;
+      } else {
+        return [
+          ...prev,
+          {
+            id: menuItem.id,
+            name: menuItem.name,
+            price: Number(menuItem.price),
+            image: menuItem.image,
+            foodType: menuItem.foodType,
+            quantity: Math.max(1, quantity),
+            specialInstructions: specialInstructions || ''
+          }
+        ];
+      }
+    });
+    return true;
+  };
+
+  const updateQuantity = (itemId, newQuantity) => {
+    setCartItems(prev => {
+      if (newQuantity <= 0) {
+        return prev.filter(item => item.id !== itemId);
+      }
+      return prev.map(item => 
+        item.id === itemId ? { ...item, quantity: newQuantity } : item
+      );
+    });
+  };
+
+  const updateItemInstructions = (itemId, instructions) => {
+    setCartItems(prev => prev.map(item => 
+      item.id === itemId ? { ...item, specialInstructions: instructions } : item
+    ));
+  };
+
+  const removeItem = (itemId) => {
+    setCartItems(prev => prev.filter(item => item.id !== itemId));
+  };
+
+  const clearCart = () => {
+    setCartItems([]);
+    localStorage.removeItem('qr_restaurant_cart');
+  };
+
+  const getItemQuantity = (itemId) => {
+    const item = cartItems.find(i => i.id === itemId);
+    return item ? item.quantity : 0;
+  };
+
+  const totalItemCount = useMemo(() => {
+    return cartItems.reduce((sum, item) => sum + item.quantity, 0);
+  }, [cartItems]);
+
+  const subtotal = useMemo(() => {
+    return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+  }, [cartItems]);
+
+  // Dynamic calculations based on active restaurant billing configuration
+  const calculateTotals = (billingConfig = {}) => {
+    const gstEnabled = billingConfig.gstEnabled ?? true;
+    const cGstRate = gstEnabled ? (billingConfig.cGstRate ?? 2.5) : 0;
+    const sGstRate = gstEnabled ? (billingConfig.sGstRate ?? 2.5) : 0;
+    const serviceChargeRate = billingConfig.serviceChargeRate ?? 0;
+    const discountRate = billingConfig.discountRate ?? 0;
+
+    const discountAmount = Number(((subtotal * discountRate) / 100).toFixed(2));
+    const taxableAmount = Math.max(0, subtotal - discountAmount);
+    
+    const cGstAmount = Number(((taxableAmount * cGstRate) / 100).toFixed(2));
+    const sGstAmount = Number(((taxableAmount * sGstRate) / 100).toFixed(2));
+    const totalTax = Number((cGstAmount + sGstAmount).toFixed(2));
+
+    const serviceChargeAmount = Number(((taxableAmount * serviceChargeRate) / 100).toFixed(2));
+    const grandTotal = Number((taxableAmount + totalTax + serviceChargeAmount).toFixed(2));
+
+    return {
+      subtotal,
+      discountAmount,
+      taxableAmount,
+      cGstRate,
+      cGstAmount,
+      sGstRate,
+      sGstAmount,
+      totalTax,
+      serviceChargeRate,
+      serviceChargeAmount,
+      grandTotal
+    };
+  };
+
+  return (
+    <CartContext.Provider value={{
+      cartItems,
+      totalItemCount,
+      subtotal,
+      tableInfo,
+      setTableInfo,
+      customerInfo,
+      setCustomerInfo,
+      addToCart,
+      updateQuantity,
+      updateItemInstructions,
+      removeItem,
+      clearCart,
+      getItemQuantity,
+      calculateTotals
+    }}>
+      {children}
+    </CartContext.Provider>
+  );
+}
+
+export function useCart() {
+  const context = useContext(CartContext);
+  if (!context) {
+    throw new Error('useCart must be used within a CartProvider');
+  }
+  return context;
+}

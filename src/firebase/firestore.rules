@@ -1,0 +1,74 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper functions
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isRestaurantAdmin(restaurantId) {
+      return isAuthenticated() && (
+        request.auth.uid == restaurantId ||
+        exists(/databases/$(database)/documents/admins/$(request.auth.uid)) &&
+        get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.restaurantId == restaurantId
+      );
+    }
+
+    // Admins collection: staff records
+    match /admins/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
+      allow write: if false; // Only manageable through Firebase Console or Admin SDK
+    }
+
+    // Restaurants
+    match /restaurants/{restaurantId} {
+      // Public can read basic restaurant info (name, logo, hours, status, settings)
+      allow read: if true;
+      // Only restaurant admin can update settings
+      allow create, update, delete: if isRestaurantAdmin(restaurantId);
+
+      // Categories subcollection
+      match /categories/{categoryId} {
+        allow read: if true;
+        allow write: if isRestaurantAdmin(restaurantId);
+      }
+
+      // Menu Items subcollection
+      match /menuItems/{itemId} {
+        allow read: if true;
+        allow write: if isRestaurantAdmin(restaurantId);
+      }
+
+      // Tables subcollection
+      match /tables/{tableId} {
+        // Public can read table info to verify valid table
+        allow read: if true;
+        allow write: if isRestaurantAdmin(restaurantId);
+      }
+
+      // Orders subcollection
+      match /orders/{orderId} {
+        // Public customer can create a valid order for dine-in
+        allow create: if request.resource.data.restaurantId == restaurantId
+          && request.resource.data.orderStatus == 'pending'
+          && request.resource.data.customerName is string
+          && request.resource.data.customerPhone is string
+          && request.resource.data.items is list
+          && request.resource.data.total is number;
+
+        // Reading an order: Customer can read their specific order by ID, admin can read all
+        allow get: if true;
+        allow list: if isRestaurantAdmin(restaurantId);
+
+        // Updating an order: Only restaurant admin can change status, bill, etc.
+        allow update, delete: if isRestaurantAdmin(restaurantId);
+      }
+
+      // Bills subcollection
+      match /bills/{billId} {
+        allow read, write: if isRestaurantAdmin(restaurantId);
+      }
+    }
+  }
+}
