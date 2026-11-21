@@ -122,7 +122,7 @@ export default function HomePage() {
                 Staff & Reception Portal
               </h2>
               <p className="text-xs text-charcoal-700/80 leading-relaxed">
-                Live order queue with notification chimes, order status workflow (Pending → Ready → Served), menu CRUD, table QR generator & 80mm bill printer.
+                Live reception queue with audio alerts: orders arrive from tables, receptionist generates the bill, gives it to the kitchen, and customers pay directly at the counter.
               </p>
             </div>
 

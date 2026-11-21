@@ -15,7 +15,7 @@ export const DEMO_RESTAURANT = {
   openingHours: "7:00 AM - 10:30 PM",
   isOpen: true,
   onlineOrderingEnabled: true,
-  estimatedPrepTime: "15-20 mins",
+  estimatedPrepTime: "10-15 mins",
   allowCustomerInstructions: true,
   hideSoldOut: false,
   notificationSound: true,
@@ -34,10 +34,10 @@ export const DEMO_RESTAURANT = {
     gstEnabled: true,
     cGstRate: 2.5, // 2.5% CGST
     sGstRate: 2.5, // 2.5% SGST
-    serviceChargeRate: 0, // optional service charge
+    serviceChargeRate: 0,
     discountRate: 0,
     gstin: "29AAAAA0000A1Z5",
-    billFooterMessage: "Thank you for dining with Naachi Café! Please visit again.",
+    billFooterMessage: "Thank you for dining with Naachi Café! Please pay directly at the counter.",
   }
 };
 
@@ -93,7 +93,8 @@ export const DEMO_MENU_ITEMS = [
     name: "Tea",
     description: "Classic brewed Indian milk chai with aromatic spices and fresh dairy milk.",
     price: 12,
-    foodType: "veg", // 'veg' | 'non-veg'
+    prepTime: 5, // in minutes
+    foodType: "veg",
     isBestseller: true,
     isAvailable: true,
     order: 1,
@@ -106,6 +107,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Ginger Tea",
     description: "Freshly crushed ginger infused milk tea with soothing aroma and warming taste.",
     price: 15,
+    prepTime: 5,
     foodType: "veg",
     isBestseller: false,
     isAvailable: true,
@@ -119,6 +121,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Lemon Tea",
     description: "Zesty invigorating black tea infused with freshly squeezed lemon juice and mint.",
     price: 15,
+    prepTime: 5,
     foodType: "veg",
     isBestseller: false,
     isAvailable: true,
@@ -132,6 +135,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Coffee",
     description: "Authentic South Indian degree filter coffee decoction with frothy hot milk.",
     price: 20,
+    prepTime: 5,
     foodType: "veg",
     isBestseller: true,
     isAvailable: true,
@@ -145,6 +149,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Black Tea",
     description: "Strong robust Assam tea leaves brewed dark without milk for pure tea essence.",
     price: 12,
+    prepTime: 5,
     foodType: "veg",
     isBestseller: false,
     isAvailable: true,
@@ -160,6 +165,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Lemon Juice",
     description: "Chilled sweet and salted freshly squeezed nimbu pani with rock salt and cumin hint.",
     price: 25,
+    prepTime: 7,
     foodType: "veg",
     isBestseller: false,
     isAvailable: true,
@@ -173,6 +179,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Watermelon Juice",
     description: "100% pure cold-pressed natural watermelon juice served refreshingly chilled.",
     price: 40,
+    prepTime: 8,
     foodType: "veg",
     isBestseller: true,
     isAvailable: true,
@@ -186,6 +193,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Orange Juice",
     description: "Fresh Nagpur oranges squeezed on order, rich in vitamin C with sweet citrus tang.",
     price: 50,
+    prepTime: 8,
     foodType: "veg",
     isBestseller: false,
     isAvailable: true,
@@ -199,6 +207,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Apple Juice",
     description: "Crisp Kashmiri red apples blended fresh with a pinch of cinnamon.",
     price: 60,
+    prepTime: 8,
     foodType: "veg",
     isBestseller: false,
     isAvailable: true,
@@ -214,6 +223,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Samosa",
     description: "Crispy flaky golden pastry stuffed with spicy mashed potatoes, green peas and herbs.",
     price: 15,
+    prepTime: 10,
     foodType: "veg",
     isBestseller: true,
     isAvailable: true,
@@ -227,6 +237,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Veg Puff",
     description: "Multi-layered bakery crust stuffed with spiced carrot, potato, and cabbage masala.",
     price: 20,
+    prepTime: 8,
     foodType: "veg",
     isBestseller: false,
     isAvailable: true,
@@ -240,6 +251,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Egg Puff",
     description: "Crispy baked puff pastry stuffed with hard-boiled egg seasoned with caramelized onion masala.",
     price: 25,
+    prepTime: 8,
     foodType: "non-veg",
     isBestseller: false,
     isAvailable: true,
@@ -255,6 +267,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Chicken Biriyani",
     description: "Aromatic basmati rice cooked with tender chicken pieces, saffron, mint and authentic dum spices.",
     price: 180,
+    prepTime: 15,
     foodType: "non-veg",
     isBestseller: true,
     isAvailable: true,
@@ -268,6 +281,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Veg Dum Biriyani",
     description: "Fragrant long-grain basmati rice layered with mixed farm vegetables, paneer and royal spices.",
     price: 140,
+    prepTime: 15,
     foodType: "veg",
     isBestseller: false,
     isAvailable: true,
@@ -283,6 +297,7 @@ export const DEMO_MENU_ITEMS = [
     name: "Gulab Jamun (2 pcs)",
     description: "Soft melt-in-mouth golden milk dough balls soaked in warm rose and cardamom syrup.",
     price: 40,
+    prepTime: 4,
     foodType: "veg",
     isBestseller: true,
     isAvailable: true,
@@ -309,14 +324,14 @@ export const DEMO_ORDERS = [
     tableName: "Table 4",
     customerName: "Rohan Sharma",
     customerPhone: "9876543210",
-    orderStatus: "pending", // 'pending' | 'accepted' | 'preparing' | 'ready' | 'served' | 'completed' | 'cancelled'
-    paymentStatus: "unpaid", // 'unpaid' | 'partially-paid' | 'paid'
-    paymentMethod: "Cash",
+    estimatedWaitTime: 15, // in minutes
+    isBilled: false, // reception laptop generates bill and gives to kitchen
     items: [
       {
         menuItemId: "item-chicken-biriyani",
         itemName: "Chicken Biriyani",
         priceAtOrder: 180,
+        prepTime: 15,
         quantity: 2,
         lineTotal: 360,
         foodType: "non-veg",
@@ -326,6 +341,7 @@ export const DEMO_ORDERS = [
         menuItemId: "item-lemon-juice",
         itemName: "Lemon Juice",
         priceAtOrder: 25,
+        prepTime: 7,
         quantity: 2,
         lineTotal: 50,
         foodType: "veg",
@@ -344,10 +360,9 @@ export const DEMO_ORDERS = [
     serviceCharge: 0,
     discount: 0,
     total: 430.50,
-    paidAmount: 0,
     specialInstructions: "Please serve juices first",
-    createdAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString()
+    createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
+    readyAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
   },
   {
     id: "ORD-1047",
@@ -357,14 +372,15 @@ export const DEMO_ORDERS = [
     tableName: "Table 2",
     customerName: "Priya Sundaram",
     customerPhone: "9123456780",
-    orderStatus: "preparing",
-    paymentStatus: "unpaid",
-    paymentMethod: "UPI",
+    estimatedWaitTime: 10,
+    isBilled: true,
+    billedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
     items: [
       {
         menuItemId: "item-coffee",
         itemName: "Coffee",
         priceAtOrder: 20,
+        prepTime: 5,
         quantity: 2,
         lineTotal: 40,
         foodType: "veg",
@@ -374,6 +390,7 @@ export const DEMO_ORDERS = [
         menuItemId: "item-samosa",
         itemName: "Samosa",
         priceAtOrder: 15,
+        prepTime: 10,
         quantity: 2,
         lineTotal: 30,
         foodType: "veg",
@@ -392,58 +409,8 @@ export const DEMO_ORDERS = [
     serviceCharge: 0,
     discount: 0,
     total: 73.50,
-    paidAmount: 0,
     specialInstructions: "",
-    createdAt: new Date(Date.now() - 35 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 25 * 60 * 1000).toISOString()
-  },
-  {
-    id: "ORD-1046",
-    orderNumber: "ORD-1046",
-    restaurantId: "naachi-cafe",
-    tableId: "T01",
-    tableName: "Table 1",
-    customerName: "Karthik Raja",
-    customerPhone: "9845123456",
-    orderStatus: "completed",
-    paymentStatus: "paid",
-    paymentMethod: "UPI",
-    items: [
-      {
-        menuItemId: "item-tea",
-        itemName: "Tea",
-        priceAtOrder: 12,
-        quantity: 2,
-        lineTotal: 24,
-        foodType: "veg",
-        specialInstructions: ""
-      },
-      {
-        menuItemId: "item-veg-puff",
-        itemName: "Veg Puff",
-        priceAtOrder: 20,
-        quantity: 1,
-        lineTotal: 20,
-        foodType: "veg",
-        specialInstructions: ""
-      }
-    ],
-    itemCount: 3,
-    subtotal: 44,
-    taxDetails: {
-      cGstRate: 2.5,
-      cGstAmount: 1.10,
-      sGstRate: 2.5,
-      sGstAmount: 1.10,
-      totalTax: 2.20
-    },
-    serviceCharge: 0,
-    discount: 0,
-    total: 46.20,
-    paidAmount: 46.20,
-    specialInstructions: "",
-    createdAt: new Date(Date.now() - 75 * 60 * 1000).toISOString(),
-    updatedAt: new Date(Date.now() - 40 * 60 * 1000).toISOString(),
-    completedAt: new Date(Date.now() - 40 * 60 * 1000).toISOString()
+    createdAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
+    readyAt: new Date(Date.now() - 10 * 60 * 1000).toISOString()
   }
 ];

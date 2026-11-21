@@ -6,27 +6,24 @@ import {
   UtensilsCrossed, 
   Clock, 
   ArrowRight, 
-  FileText, 
   Phone,
-  ChefHat
+  ChefHat,
+  Receipt
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
-import { OrderStatusBadge } from '../../components/common/Badge';
 
 export default function CustomerOrderSuccessPage() {
   const { restaurantSlug = 'naachi-cafe', orderId } = useParams();
   const location = useLocation();
   const { restaurant, orders } = useRestaurant();
 
-  // Try to find order from location state or from orders list
   const order = location.state?.order || orders.find(o => o.id === orderId);
 
   useEffect(() => {
-    // Fire celebration confetti once upon mounting
     try {
       confetti({
-        particleCount: 60,
+        particleCount: 50,
         spread: 60,
         origin: { y: 0.6 }
       });
@@ -34,6 +31,7 @@ export default function CustomerOrderSuccessPage() {
   }, []);
 
   const currency = restaurant.billing?.currency || '₹';
+  const waitMinutes = order?.estimatedWaitTime || 15;
 
   return (
     <div className="min-h-screen bg-cream-100 text-charcoal-900 pb-16">
@@ -44,22 +42,36 @@ export default function CustomerOrderSuccessPage() {
             <CheckCircle className="w-9 h-9 text-gold-400 stroke-[2.5]" />
           </div>
           <h1 className="font-serif font-bold text-2xl sm:text-3xl text-white">
-            Order Placed Successfully!
+            Order Sent to Reception!
           </h1>
           <p className="text-forest-100 text-xs sm:text-sm">
-            Your order has been sent directly to the kitchen dashboard.
+            Received on the reception laptop &bull; Bill is being printed for kitchen
           </p>
         </div>
       </div>
 
       <main className="max-w-md mx-auto px-4 -mt-5 space-y-4">
-        {/* Order Identifier Card */}
-        <div className="bg-white rounded-2xl p-5 border border-cream-200 shadow-elevated text-center space-y-3">
+        {/* Waiting Time Display Card */}
+        <div className="bg-white rounded-2xl p-5 border border-cream-200 shadow-elevated text-center space-y-4">
           <div className="flex items-center justify-between border-b border-cream-200 pb-3">
             <span className="text-xs text-charcoal-700/70 font-bold uppercase tracking-wider">Order No</span>
             <span className="font-mono font-bold text-base text-forest-800 bg-cream-100 px-2.5 py-1 rounded-md border border-cream-300">
               {order ? order.orderNumber : orderId}
             </span>
+          </div>
+
+          {/* Big Waiting Time Callout */}
+          <div className="p-4 bg-forest-50 border-2 border-forest-200 rounded-2xl text-center space-y-1">
+            <div className="flex items-center justify-center gap-1.5 text-forest-700 text-xs font-bold uppercase tracking-wider">
+              <Clock className="w-4 h-4 text-forest-700 animate-pulse" />
+              <span>Estimated Waiting Time</span>
+            </div>
+            <div className="font-serif font-bold text-3xl text-forest-900">
+              ~{waitMinutes} Minutes
+            </div>
+            <p className="text-xs text-forest-700/80">
+              Your food is being freshly prepared for {order?.tableName || 'your table'}.
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3 py-2 text-left bg-cream-50/80 p-3 rounded-xl border border-cream-200">
@@ -79,38 +91,31 @@ export default function CustomerOrderSuccessPage() {
             </div>
           </div>
 
-          {/* Status Banner */}
-          <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between text-xs">
-            <div className="flex items-center gap-2 text-amber-900 font-medium">
-              <Clock className="w-4 h-4 text-amber-600 animate-spin" />
-              <span>Current Status:</span>
-            </div>
-            <OrderStatusBadge status={order?.orderStatus || 'pending'} />
+          <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-900 font-medium">
+            💳 <strong>Pay Directly at Counter:</strong> Simply show this bill or quote {order?.orderNumber} when paying after your meal.
           </div>
-
-          <p className="text-xs text-charcoal-700/70 text-center">
-            {order?.orderStatus === 'pending'
-              ? 'Status: Pending confirmation by restaurant reception'
-              : `Status: ${order?.orderStatus?.toUpperCase()}`}
-          </p>
         </div>
 
         {/* Ordered Items Breakdown */}
         {order?.items && (
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-cream-200 shadow-soft space-y-3">
             <h2 className="text-xs font-bold font-serif text-charcoal-900 uppercase tracking-wider border-b border-cream-200 pb-2">
-              Order Receipt ({order.items.length} items)
+              Itemized Bill ({order.items.length} items)
             </h2>
 
             <div className="space-y-2 text-xs">
               {order.items.map((item, idx) => (
                 <div key={idx} className="flex justify-between items-center text-charcoal-700">
                   <div className="flex-1 min-w-0 pr-2">
-                    <span className="font-semibold text-charcoal-900">
+                    <div className="font-semibold text-charcoal-900">
                       {item.quantity}x {item.itemName}
-                    </span>
+                    </div>
+                    <div className="text-[10px] text-forest-700 flex items-center gap-1">
+                      <Clock className="w-2.5 h-2.5" />
+                      <span>{item.prepTime || 10} mins prep</span>
+                    </div>
                     {item.specialInstructions && (
-                      <p className="text-[10px] text-forest-700 italic">
+                      <p className="text-[10px] text-charcoal-600 italic">
                         Note: {item.specialInstructions}
                       </p>
                     )}
@@ -133,14 +138,8 @@ export default function CustomerOrderSuccessPage() {
                   <span>{formatCurrency(order.taxDetails.totalTax, currency)}</span>
                 </div>
               )}
-              {order.serviceCharge > 0 && (
-                <div className="flex justify-between">
-                  <span>Service Charge</span>
-                  <span>{formatCurrency(order.serviceCharge, currency)}</span>
-                </div>
-              )}
               <div className="flex justify-between items-baseline text-sm font-bold text-charcoal-900 pt-2 border-t border-cream-200">
-                <span className="font-serif">Grand Total</span>
+                <span className="font-serif">Total Bill to Pay</span>
                 <span className="text-lg font-serif text-forest-800">
                   {formatCurrency(order.total, currency)}
                 </span>
@@ -155,8 +154,8 @@ export default function CustomerOrderSuccessPage() {
             to={`/order/${orderId}`}
             className="w-full py-3 px-4 bg-forest-700 hover:bg-forest-800 text-white rounded-xl font-bold text-sm shadow-md transition flex items-center justify-center gap-2"
           >
-            <ChefHat className="w-4 h-4" />
-            <span>Track Live Order Status</span>
+            <Clock className="w-4 h-4" />
+            <span>View Live Waiting Timer</span>
             <ArrowRight className="w-4 h-4" />
           </Link>
 
@@ -167,19 +166,6 @@ export default function CustomerOrderSuccessPage() {
             <span>Back to Digital Menu</span>
           </Link>
         </div>
-
-        {/* Restaurant Contact Help */}
-        {restaurant.phone && (
-          <div className="text-center pt-2">
-            <a 
-              href={`tel:${restaurant.phone}`}
-              className="inline-flex items-center gap-1.5 text-xs text-forest-700 hover:underline font-semibold"
-            >
-              <Phone className="w-3.5 h-3.5" />
-              <span>Need help? Call {restaurant.name}</span>
-            </a>
-          </div>
-        )}
       </main>
     </div>
   );

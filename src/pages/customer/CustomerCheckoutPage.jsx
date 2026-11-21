@@ -6,10 +6,10 @@ import {
   Phone, 
   UtensilsCrossed, 
   MessageSquare, 
-  ShieldCheck, 
-  Loader2,
-  CheckCircle2,
-  AlertCircle
+  Loader2, 
+  CheckCircle2, 
+  Clock, 
+  AlertCircle 
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useCart } from '../../context/CartContext';
@@ -40,25 +40,23 @@ export default function CustomerCheckoutPage() {
   const totals = calculateTotals(billingConfig);
   const currency = billingConfig.currency || '₹';
 
-  // Validation
   const validateForm = () => {
     if (!name.trim()) {
-      return 'Please enter your full name.';
+      return 'Please enter your name.';
     }
     const cleanPhone = phone.trim();
     if (!cleanPhone) {
       return 'Please enter your mobile number.';
     }
-    // Indian 10-digit mobile number starting with 6, 7, 8, or 9
     const phoneRegex = /^[6-9]\d{9}$/;
     if (!phoneRegex.test(cleanPhone)) {
-      return 'Please enter a valid 10-digit Indian mobile number (e.g., 9876543210).';
+      return 'Please enter a valid 10-digit Indian mobile number.';
     }
     if (!tableInfo || !tableInfo.id) {
-      return 'Please select your dine-in table.';
+      return 'Please select your table.';
     }
     if (cartItems.length === 0) {
-      return 'Your cart is empty. Please add items to proceed.';
+      return 'Your cart is empty.';
     }
     return null;
   };
@@ -76,14 +74,13 @@ export default function CustomerCheckoutPage() {
     setIsSubmitting(true);
 
     try {
-      // Save customer info for reuse
       setCustomerInfo({
         name: name.trim(),
         phone: phone.trim(),
         instructions: instructions.trim()
       });
 
-      // Submit order to RestaurantContext with server-level price snapshot validation
+      // Submit order to reception laptop with calculated waiting time
       const result = await submitCustomerOrder({
         customerName: name.trim(),
         customerPhone: phone.trim(),
@@ -131,14 +128,29 @@ export default function CustomerCheckoutPage() {
             <ArrowLeft className="w-5 h-5" />
           </Link>
           <div>
-            <h1 className="font-serif font-bold text-lg leading-tight">Confirm & Place Order</h1>
-            <p className="text-xs text-forest-700 font-medium">{restaurant.name} &bull; Dine-In</p>
+            <h1 className="font-serif font-bold text-lg leading-tight">Confirm & Send to Reception</h1>
+            <p className="text-xs text-forest-700 font-medium">{restaurant.name} &bull; {tableInfo?.name}</p>
           </div>
         </div>
       </header>
 
       <main className="max-w-xl mx-auto px-4 py-4 space-y-4">
-        {/* Error Alert if any */}
+        {/* Waiting Time Notice */}
+        <div className="bg-forest-800 text-white rounded-2xl p-4 shadow-soft flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Clock className="w-6 h-6 text-gold-400" />
+            <div>
+              <span className="text-xs text-forest-200 block">Estimated Waiting Time</span>
+              <span className="font-serif font-bold text-base text-white">
+                ~{totals.estimatedOrderWaitTime || 10} Minutes
+              </span>
+            </div>
+          </div>
+          <span className="text-xs bg-forest-700 px-3 py-1 rounded-full text-gold-300 font-bold border border-forest-600">
+            {tableInfo?.name}
+          </span>
+        </div>
+
         {formError && (
           <div className="p-3 bg-rose-50 border border-rose-300 rounded-xl flex items-start gap-2.5 text-xs text-rose-900">
             <AlertCircle className="w-4 h-4 text-rose-600 flex-shrink-0 mt-0.5" />
@@ -147,14 +159,12 @@ export default function CustomerCheckoutPage() {
         )}
 
         <form onSubmit={handlePlaceOrder} className="space-y-4">
-          {/* Customer Details Card */}
+          {/* Customer Details */}
           <div className="bg-white rounded-2xl p-4 sm:p-5 border border-cream-200 shadow-soft space-y-4">
-            <h2 className="text-sm font-bold font-serif text-charcoal-900 border-b border-cream-200 pb-2 flex items-center justify-between">
-              <span>Customer Information</span>
-              <span className="text-[11px] font-sans font-normal text-charcoal-700/60">No account required</span>
+            <h2 className="text-sm font-bold font-serif text-charcoal-900 border-b border-cream-200 pb-2">
+              Guest Details
             </h2>
 
-            {/* Name */}
             <div>
               <label className="block text-xs font-bold text-charcoal-700 mb-1">
                 Your Name <span className="text-rose-500">*</span>
@@ -173,7 +183,6 @@ export default function CustomerCheckoutPage() {
               </div>
             </div>
 
-            {/* Mobile Number */}
             <div>
               <label className="block text-xs font-bold text-charcoal-700 mb-1">
                 Mobile Number <span className="text-rose-500">*</span>
@@ -194,12 +203,8 @@ export default function CustomerCheckoutPage() {
                   className="w-full pl-11 pr-3 py-2.5 text-sm bg-cream-50 border border-cream-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 focus:bg-white transition"
                 />
               </div>
-              <p className="text-[10px] text-charcoal-700/60 mt-1">
-                Used by restaurant staff for order verification and updates.
-              </p>
             </div>
 
-            {/* Table Confirmation */}
             <div>
               <label className="block text-xs font-bold text-charcoal-700 mb-1">
                 Dine-In Table <span className="text-rose-500">*</span>
@@ -220,7 +225,6 @@ export default function CustomerCheckoutPage() {
                   }}
                   className="w-full pl-9 pr-8 py-2.5 text-sm bg-cream-50 border border-cream-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 font-semibold text-charcoal-900"
                 >
-                  <option value="" disabled>-- Select Table --</option>
                   {tables.map(t => (
                     <option key={t.id} value={t.id}>{t.name}</option>
                   ))}
@@ -228,17 +232,16 @@ export default function CustomerCheckoutPage() {
               </div>
             </div>
 
-            {/* Overall Order Instructions */}
             <div>
               <label className="block text-xs font-bold text-charcoal-700 mb-1 flex items-center gap-1">
                 <MessageSquare className="w-3.5 h-3.5 text-forest-700" />
-                <span>Special Instructions for the Kitchen (Optional)</span>
+                <span>Special Instructions for Kitchen (Optional)</span>
               </label>
               <textarea 
                 rows={2}
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
-                placeholder="e.g. Please serve drinks first, less spice in all items..."
+                placeholder="e.g. Serve hot, less spice in all items..."
                 maxLength={150}
                 className="w-full p-2.5 text-xs bg-cream-50 border border-cream-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 focus:bg-white transition"
               />
@@ -280,14 +283,8 @@ export default function CustomerCheckoutPage() {
                   <span>{formatCurrency(totals.totalTax, currency)}</span>
                 </div>
               )}
-              {totals.serviceChargeAmount > 0 && (
-                <div className="flex justify-between">
-                  <span>Service Charge</span>
-                  <span>{formatCurrency(totals.serviceChargeAmount, currency)}</span>
-                </div>
-              )}
               <div className="flex justify-between items-baseline text-sm font-bold text-charcoal-900 pt-1 border-t border-cream-200">
-                <span className="font-serif">Total to Pay</span>
+                <span className="font-serif">Total Bill</span>
                 <span className="text-base font-serif text-forest-800">
                   {formatCurrency(totals.grandTotal, currency)}
                 </span>
@@ -295,14 +292,12 @@ export default function CustomerCheckoutPage() {
             </div>
           </div>
 
-          {/* Payment Notice */}
-          <div className="p-3 bg-cream-50 border border-cream-300 rounded-xl flex items-center gap-2.5 text-xs text-charcoal-700">
-            <ShieldCheck className="w-5 h-5 text-forest-700 flex-shrink-0" />
-            <span>Pay directly at the counter or to your server after your meal via Cash, UPI, or Card.</span>
-          </div>
+          <p className="text-[11px] text-charcoal-600 text-center font-medium bg-cream-50 p-2.5 rounded-xl border border-cream-200">
+            Your order will show directly on the reception laptop. You can pay directly at the counter.
+          </p>
 
           {/* Submit Button */}
-          <div className="pt-2">
+          <div className="pt-1">
             <button
               type="submit"
               disabled={isSubmitting}
@@ -311,12 +306,12 @@ export default function CustomerCheckoutPage() {
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Submitting Order to Restaurant...</span>
+                  <span>Sending to Reception...</span>
                 </>
               ) : (
                 <>
                   <CheckCircle2 className="w-5 h-5" />
-                  <span>Place Order &bull; {formatCurrency(totals.grandTotal, currency)}</span>
+                  <span>Send Order &bull; {formatCurrency(totals.grandTotal, currency)}</span>
                 </>
               )}
             </button>

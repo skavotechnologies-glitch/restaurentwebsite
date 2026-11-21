@@ -53,6 +53,7 @@ export function CartProvider({ children }) {
             id: menuItem.id,
             name: menuItem.name,
             price: Number(menuItem.price),
+            prepTime: Number(menuItem.prepTime) || 10,
             image: menuItem.image,
             foodType: menuItem.foodType,
             quantity: Math.max(1, quantity),
@@ -103,7 +104,13 @@ export function CartProvider({ children }) {
     return cartItems.reduce((sum, item) => sum + (item.price * item.quantity), 0);
   }, [cartItems]);
 
-  // Dynamic calculations based on active restaurant billing configuration
+  // Max prep time among items in the cart
+  const estimatedOrderWaitTime = useMemo(() => {
+    if (cartItems.length === 0) return 0;
+    return Math.max(...cartItems.map(i => i.prepTime || 10));
+  }, [cartItems]);
+
+  // Calculations based on active restaurant billing configuration
   const calculateTotals = (billingConfig = {}) => {
     const gstEnabled = billingConfig.gstEnabled ?? true;
     const cGstRate = gstEnabled ? (billingConfig.cGstRate ?? 2.5) : 0;
@@ -132,7 +139,8 @@ export function CartProvider({ children }) {
       totalTax,
       serviceChargeRate,
       serviceChargeAmount,
-      grandTotal
+      grandTotal,
+      estimatedOrderWaitTime
     };
   };
 
@@ -141,6 +149,7 @@ export function CartProvider({ children }) {
       cartItems,
       totalItemCount,
       subtotal,
+      estimatedOrderWaitTime,
       tableInfo,
       setTableInfo,
       customerInfo,

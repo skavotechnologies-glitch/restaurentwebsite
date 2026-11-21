@@ -55,8 +55,8 @@ export default function AdminLayout() {
     return null;
   }
 
-  // Count active pending orders
-  const pendingOrdersCount = orders.filter(o => o.orderStatus === 'pending').length;
+  // Count orders pending bill generation for kitchen
+  const pendingOrdersCount = orders.filter(o => !o.isBilled).length;
 
   const handleLogout = async () => {
     await logout();

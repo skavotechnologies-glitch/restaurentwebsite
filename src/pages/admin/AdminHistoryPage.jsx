@@ -2,24 +2,21 @@ import React, { useState, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { 
   Search, 
-  Filter, 
   Calendar, 
   Receipt, 
   UtensilsCrossed, 
-  Phone, 
-  ArrowUpRight,
-  Download
+  Clock,
+  Printer
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
-import { OrderStatusBadge, PaymentStatusBadge } from '../../components/common/Badge';
+import { OrderBillStatusBadge } from '../../components/common/Badge';
 
 export default function AdminHistoryPage() {
   const { restaurant, orders } = useRestaurant();
 
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [paymentFilter, setPaymentFilter] = useState('all');
+  const [billFilter, setBillFilter] = useState('all'); // 'all' | 'billed' | 'pending'
   const [timeFilter, setTimeFilter] = useState('all'); // 'today' | '7days' | '30days' | 'all'
 
   const currency = restaurant.billing?.currency || '₹';
@@ -37,15 +34,9 @@ export default function AdminHistoryPage() {
         if (timeFilter === '30days' && diffDays > 30) return false;
       }
 
-      // Status filter
-      if (statusFilter !== 'all' && order.orderStatus !== statusFilter) {
-        return false;
-      }
-
-      // Payment filter
-      if (paymentFilter !== 'all' && order.paymentStatus !== paymentFilter) {
-        return false;
-      }
+      // Bill filter
+      if (billFilter === 'billed' && !order.isBilled) return false;
+      if (billFilter === 'pending' && order.isBilled) return false;
 
       // Search query
       if (searchQuery.trim()) {
@@ -59,12 +50,10 @@ export default function AdminHistoryPage() {
 
       return true;
     });
-  }, [orders, timeFilter, statusFilter, paymentFilter, searchQuery]);
+  }, [orders, timeFilter, billFilter, searchQuery]);
 
   const totalFilteredRevenue = useMemo(() => {
-    return filteredOrders
-      .filter(o => o.orderStatus !== 'cancelled')
-      .reduce((sum, o) => sum + (o.total || 0), 0);
+    return filteredOrders.reduce((sum, o) => sum + (o.total || 0), 0);
   }, [filteredOrders]);
 
   return (
@@ -73,10 +62,10 @@ export default function AdminHistoryPage() {
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h1 className="font-serif font-bold text-2xl text-charcoal-900">
-            Order & Billing History
+            Order & Kitchen Billing History
           </h1>
           <p className="text-xs text-charcoal-700/70">
-            Archive of all customer orders, payments, receipts, and past transactions
+            Archive of table orders, preparation times, and generated kitchen bills
           </p>
         </div>
 
@@ -87,7 +76,7 @@ export default function AdminHistoryPage() {
           </div>
           <div className="h-6 w-px bg-slate-200" />
           <div>
-            <span className="text-charcoal-700/60 block">Filtered Volume</span>
+            <span className="text-charcoal-700/60 block">Filtered Sales</span>
             <strong className="text-forest-800 text-sm font-serif">
               {formatCurrency(totalFilteredRevenue, currency)}
             </strong>
@@ -97,7 +86,7 @@ export default function AdminHistoryPage() {
 
       {/* Filters Toolbar */}
       <div className="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm space-y-3">
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
           {/* Search box */}
           <div className="relative">
             <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -124,32 +113,16 @@ export default function AdminHistoryPage() {
             </select>
           </div>
 
-          {/* Order status */}
+          {/* Bill status */}
           <div>
             <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
+              value={billFilter}
+              onChange={(e) => setBillFilter(e.target.value)}
               className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 font-semibold"
             >
-              <option value="all">All Statuses</option>
-              <option value="completed">Completed Only</option>
-              <option value="served">Served Only</option>
-              <option value="cancelled">Cancelled Only</option>
-              <option value="pending">Pending Only</option>
-            </select>
-          </div>
-
-          {/* Payment status */}
-          <div>
-            <select
-              value={paymentFilter}
-              onChange={(e) => setPaymentFilter(e.target.value)}
-              className="w-full px-3 py-2 text-xs bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 font-semibold"
-            >
-              <option value="all">All Payments</option>
-              <option value="paid">Paid in Full</option>
-              <option value="partially-paid">Partial Payment</option>
-              <option value="unpaid">Unpaid</option>
+              <option value="all">All Orders</option>
+              <option value="billed">Billed to Kitchen</option>
+              <option value="pending">Pending Bill</option>
             </select>
           </div>
         </div>
@@ -165,11 +138,11 @@ export default function AdminHistoryPage() {
                 <th className="py-3 px-4">Date & Time</th>
                 <th className="py-3 px-4">Table</th>
                 <th className="py-3 px-4">Customer</th>
-                <th className="py-3 px-4">Summary</th>
-                <th className="py-3 px-4">Total</th>
-                <th className="py-3 px-4">Order Status</th>
-                <th className="py-3 px-4">Payment</th>
-                <th className="py-3 px-4 text-right">Reprint Bill</th>
+                <th className="py-3 px-4">Items Summary</th>
+                <th className="py-3 px-4">Wait Time</th>
+                <th className="py-3 px-4">Bill Amount</th>
+                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Reprint</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -206,23 +179,19 @@ export default function AdminHistoryPage() {
                       {order.items?.map(i => `${i.quantity}x ${i.itemName}`).join(', ')}
                     </td>
 
+                    <td className="py-3 px-4 whitespace-nowrap">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200">
+                        <Clock className="w-3 h-3 text-amber-600" />
+                        <span>~{order.estimatedWaitTime || 15}m</span>
+                      </span>
+                    </td>
+
                     <td className="py-3 px-4 font-bold font-serif text-charcoal-900 whitespace-nowrap">
                       {formatCurrency(order.total, currency)}
                     </td>
 
                     <td className="py-3 px-4 whitespace-nowrap">
-                      <OrderStatusBadge status={order.orderStatus} />
-                    </td>
-
-                    <td className="py-3 px-4 whitespace-nowrap">
-                      <div className="space-y-0.5">
-                        <PaymentStatusBadge status={order.paymentStatus} />
-                        {order.paymentMethod && (
-                          <div className="text-[10px] text-charcoal-700/60 uppercase">
-                            {order.paymentMethod}
-                          </div>
-                        )}
-                      </div>
+                      <OrderBillStatusBadge isBilled={order.isBilled} />
                     </td>
 
                     <td className="py-3 px-4 text-right whitespace-nowrap">
@@ -230,7 +199,7 @@ export default function AdminHistoryPage() {
                         to={`/admin/billing?orderId=${order.id}`}
                         className="inline-flex items-center gap-1 px-3 py-1 bg-slate-100 hover:bg-slate-200 text-charcoal-800 rounded-lg font-bold text-xs transition"
                       >
-                        <Receipt className="w-3.5 h-3.5 text-forest-700" />
+                        <Printer className="w-3.5 h-3.5 text-forest-700" />
                         <span>Bill</span>
                       </Link>
                     </td>

@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Plus, Minus, Flame, MessageSquare, Check } from 'lucide-react';
+import { Plus, Minus, Flame, MessageSquare, Check, Clock } from 'lucide-react';
 import VegNonVegIcon from '../common/VegNonVegIcon';
 import { formatCurrency } from '../../utils/formatters';
 
@@ -15,6 +15,7 @@ export default function MenuItemCard({
   const [showInstructions, setShowInstructions] = useState(false);
   const [instructionsText, setInstructionsText] = useState(item.specialInstructions || '');
   const isAvailable = item.isAvailable !== false;
+  const prepMinutes = item.prepTime || 10;
 
   const handleSaveInstructions = () => {
     if (onUpdateInstructions) {
@@ -30,9 +31,15 @@ export default function MenuItemCard({
       <div className="flex gap-3 sm:gap-4 items-start">
         {/* Info Column */}
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-1.5 mb-1">
+          <div className="flex flex-wrap items-center gap-1.5 mb-1">
             <VegNonVegIcon type={item.foodType} size="sm" />
             
+            {/* Waiting Time for this specific food */}
+            <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-charcoal-700 bg-cream-100 px-2 py-0.5 rounded-full border border-cream-300">
+              <Clock className="w-2.5 h-2.5 text-forest-700" />
+              <span>{prepMinutes} mins</span>
+            </span>
+
             {item.isBestseller && (
               <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
                 <Flame className="w-2.5 h-2.5 fill-amber-500 text-amber-500" />
@@ -55,7 +62,7 @@ export default function MenuItemCard({
             </p>
           )}
 
-          {/* If already in cart, show small button for notes */}
+          {/* If already in cart, show note toggle */}
           {quantity > 0 && (
             <button
               onClick={() => setShowInstructions(!showInstructions)}

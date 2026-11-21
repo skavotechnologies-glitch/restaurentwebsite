@@ -22,7 +22,6 @@ import { playOrderAlert, testNotificationSound } from '../utils/sound';
 const RestaurantContext = createContext(null);
 
 export function RestaurantProvider({ children }) {
-  // Multi-restaurant active identifier
   const [activeSlug, setActiveSlug] = useState('naachi-cafe');
 
   // Restaurant details & settings
@@ -37,7 +36,7 @@ export function RestaurantProvider({ children }) {
     return saved ? JSON.parse(saved) : DEMO_CATEGORIES;
   });
 
-  // Menu Items
+  // Menu Items (with prepTime in minutes)
   const [menuItems, setMenuItems] = useState(() => {
     const saved = localStorage.getItem(`qr_menu_${activeSlug}`);
     return saved ? JSON.parse(saved) : DEMO_MENU_ITEMS;
@@ -89,7 +88,7 @@ export function RestaurantProvider({ children }) {
     localStorage.setItem('qr_notification_sound', JSON.stringify(soundEnabled));
   }, [soundEnabled]);
 
-  // Real-time listener for Orders (Firebase or Cross-tab storage/event bus)
+  // Real-time listener for Orders on reception laptop (Firebase or local event bus)
   useEffect(() => {
     if (isFirebaseConfigured && db) {
       try {
@@ -102,9 +101,9 @@ export function RestaurantProvider({ children }) {
             fetchedOrders.push({ id: doc.id, ...doc.data() });
           });
 
-          // Check if there are newly added orders
+          // Ring reception alert chime for newly arriving table orders
           setSeenOrderIds((prevSeen) => {
-            const newOrders = fetchedOrders.filter(o => !prevSeen.has(o.id) && o.orderStatus === 'pending');
+            const newOrders = fetchedOrders.filter(o => !prevSeen.has(o.id) && !o.isBilled);
             if (newOrders.length > 0 && soundEnabled) {
               playOrderAlert();
             }
@@ -121,7 +120,7 @@ export function RestaurantProvider({ children }) {
         console.warn('Firestore listener setup failed:', err);
       }
     } else {
-      // Local event listener for cross-tab or same-window order notification
+      // Local event listener for cross-tab or same-window order notification to reception
       const handleCustomOrderEvent = (e) => {
         if (e.detail && e.detail.order) {
           const newOrder = e.detail.order;
@@ -158,7 +157,7 @@ export function RestaurantProvider({ children }) {
   const tablesWithLiveStatus = useMemo(() => {
     const activeTableIds = new Set(
       orders
-        .filter(o => ['pending', 'accepted', 'preparing', 'ready', 'served'].includes(o.orderStatus))
+        .filter(o => !o.isBilled)
         .map(o => o.tableId)
     );
 
@@ -169,7 +168,7 @@ export function RestaurantProvider({ children }) {
     }));
   }, [tables, orders]);
 
-  // Submit Customer Order with Provider-Side Price Validation
+  // Submit Customer Order: calculates waiting time for the customer and routes order to reception laptop
   const submitCustomerOrder = useCallback(async ({
     customerName,
     customerPhone,
@@ -191,9 +190,10 @@ export function RestaurantProvider({ children }) {
       throw new Error('Please select or scan a valid table QR code.');
     }
 
-    // 1. Validate cart items against current menu snapshot
+    // 1. Validate cart items against current menu snapshot & compute waiting times
     const validatedItems = [];
     let calculatedSubtotal = 0;
+    let maxWaitMinutes = 10;
 
     for (const cartItem of items) {
       const liveItem = menuItems.find(m => m.id === cartItem.id);
@@ -205,6 +205,11 @@ export function RestaurantProvider({ children }) {
       }
 
       const verifiedPrice = Number(liveItem.price);
+      const prepTime = Number(liveItem.prepTime) || 10;
+      if (prepTime > maxWaitMinutes) {
+        maxWaitMinutes = prepTime;
+      }
+
       const qty = Math.max(1, parseInt(cartItem.quantity, 10));
       const lineTotal = verifiedPrice * qty;
 
@@ -214,6 +219,7 @@ export function RestaurantProvider({ children }) {
         menuItemId: liveItem.id,
         itemName: liveItem.name,
         priceAtOrder: verifiedPrice,
+        prepTime,
         quantity: qty,
         lineTotal,
         foodType: liveItem.foodType,
@@ -250,6 +256,9 @@ export function RestaurantProvider({ children }) {
     const orderNumber = `ORD-${nextNumber}`;
     const orderId = `${orderNumber.toLowerCase()}-${Date.now().toString(36)}`;
 
+    const now = new Date();
+    const readyAtDate = new Date(now.getTime() + maxWaitMinutes * 60 * 1000);
+
     const newOrder = {
       id: orderId,
       orderNumber,
@@ -272,13 +281,18 @@ export function RestaurantProvider({ children }) {
       serviceCharge: serviceChargeAmount,
       discount: discountAmount,
       total: grandTotal,
-      paymentStatus: 'unpaid',
-      paymentMethod: 'Pending',
-      paidAmount: 0,
-      orderStatus: 'pending',
+      
+      // Waiting time replacing multi-stage status
+      estimatedWaitTime: maxWaitMinutes,
+      readyAt: readyAtDate.toISOString(),
+      
+      // Reception billing indicator
+      isBilled: false,
+      billedAt: null,
+      
       specialInstructions: specialInstructions.trim(),
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString()
+      createdAt: now.toISOString(),
+      updatedAt: now.toISOString()
     };
 
     // 4. Save to Firestore or Local Storage
@@ -291,7 +305,7 @@ export function RestaurantProvider({ children }) {
       }
     }
 
-    // Always update local state & broadcast
+    // Update local state & broadcast to reception laptop
     setOrders(prev => [newOrder, ...prev]);
     setSeenOrderIds(prev => new Set([...prev, orderId]));
 
@@ -311,15 +325,13 @@ export function RestaurantProvider({ children }) {
     };
   }, [menuItems, orders, activeSlug, restaurant, soundEnabled]);
 
-  // Update Order Status (Pending -> Accepted -> Preparing -> Ready -> Served -> Completed)
-  const updateOrderStatus = async (orderId, newStatus) => {
+  // Reception laptop marks order as Billed & Sent to Kitchen
+  const markOrderBilled = async (orderId) => {
     const timestamp = new Date().toISOString();
     const updatePayload = {
-      orderStatus: newStatus,
-      updatedAt: timestamp,
-      ...(newStatus === 'accepted' ? { acceptedAt: timestamp } : {}),
-      ...(newStatus === 'completed' ? { completedAt: timestamp } : {}),
-      ...(newStatus === 'cancelled' ? { cancelledAt: timestamp } : {})
+      isBilled: true,
+      billedAt: timestamp,
+      updatedAt: timestamp
     };
 
     if (isFirebaseConfigured && db) {
@@ -327,42 +339,14 @@ export function RestaurantProvider({ children }) {
         const orderRef = doc(db, 'restaurants', activeSlug, 'orders', orderId);
         await updateDoc(orderRef, updatePayload);
       } catch (err) {
-        console.warn('Firestore updateOrderStatus error:', err);
+        console.warn('Firestore markOrderBilled error:', err);
       }
     }
 
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatePayload } : o));
   };
 
-  // Record Payment
-  const recordPayment = async (orderId, { paymentMethod, paymentStatus = 'paid', paidAmount, note = '' }) => {
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return;
-
-    const finalPaidAmount = paidAmount !== undefined ? Number(paidAmount) : order.total;
-    const updatePayload = {
-      paymentMethod: paymentMethod || 'Cash',
-      paymentStatus,
-      paidAmount: finalPaidAmount,
-      paymentNote: note,
-      updatedAt: new Date().toISOString(),
-      // If full payment recorded, auto-advance served/completed if desirable
-      ...(paymentStatus === 'paid' && order.orderStatus === 'served' ? { orderStatus: 'completed', completedAt: new Date().toISOString() } : {})
-    };
-
-    if (isFirebaseConfigured && db) {
-      try {
-        const orderRef = doc(db, 'restaurants', activeSlug, 'orders', orderId);
-        await updateDoc(orderRef, updatePayload);
-      } catch (err) {
-        console.warn('Firestore recordPayment error:', err);
-      }
-    }
-
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatePayload } : o));
-  };
-
-  // Generate / Reprint Bill
+  // Generate / Reprint Bill & Kitchen Order Ticket (KOT)
   const generateBill = (orderId, customTaxConfig = null) => {
     const order = orders.find(o => o.id === orderId);
     if (!order) return null;
@@ -380,7 +364,7 @@ export function RestaurantProvider({ children }) {
         phone: restaurant.phone,
         gstin: billingConfig.gstin || restaurant.billing?.gstin || '',
         logo: restaurant.logo,
-        footerMessage: billingConfig.billFooterMessage || restaurant.billing?.billFooterMessage
+        footerMessage: billingConfig.billFooterMessage || "Thank you! Please pay directly at the counter."
       },
       customer: {
         name: order.customerName,
@@ -393,22 +377,22 @@ export function RestaurantProvider({ children }) {
       taxDetails: order.taxDetails,
       serviceCharge: order.serviceCharge || 0,
       total: order.total,
-      paidAmount: order.paidAmount || 0,
-      balanceDue: Math.max(0, order.total - (order.paidAmount || 0)),
-      paymentStatus: order.paymentStatus,
-      paymentMethod: order.paymentMethod,
+      estimatedWaitTime: order.estimatedWaitTime || 10,
+      isBilled: order.isBilled,
+      billedAt: order.billedAt,
       date: order.createdAt,
       generatedAt: new Date().toISOString()
     };
   };
 
-  // Menu Items Management (CRUD)
+  // Menu Items Management (CRUD) with Prep Time support
   const addMenuItem = async (itemData) => {
     const newItem = {
       id: `item-${Date.now().toString(36)}`,
       restaurantId: activeSlug,
       isAvailable: true,
       isBestseller: false,
+      prepTime: Number(itemData.prepTime) || 10,
       order: menuItems.length + 1,
       ...itemData,
       price: Number(itemData.price),
@@ -429,6 +413,7 @@ export function RestaurantProvider({ children }) {
     const parsedUpdates = {
       ...updates,
       ...(updates.price !== undefined ? { price: Number(updates.price) } : {}),
+      ...(updates.prepTime !== undefined ? { prepTime: Number(updates.prepTime) } : {}),
       updatedAt: new Date().toISOString()
     };
 
@@ -518,12 +503,9 @@ export function RestaurantProvider({ children }) {
   };
 
   const deleteTable = async (tableId) => {
-    // Check if table has active order
-    const hasActiveOrder = orders.some(o => 
-      o.tableId === tableId && ['pending', 'accepted', 'preparing', 'ready', 'served'].includes(o.orderStatus)
-    );
+    const hasActiveOrder = orders.some(o => o.tableId === tableId && !o.isBilled);
     if (hasActiveOrder) {
-      throw new Error('Cannot delete a table with an active in-progress order. Please complete or cancel the order first.');
+      throw new Error('Cannot delete a table with an active unbilled order. Please generate bill or clear order first.');
     }
 
     if (isFirebaseConfigured && db) {
@@ -546,7 +528,7 @@ export function RestaurantProvider({ children }) {
     setRestaurant(merged);
   };
 
-  // Reset to clean demo state
+  // Reset demo
   const resetDemoData = () => {
     setRestaurant(DEMO_RESTAURANT);
     setCategories(DEMO_CATEGORIES);
@@ -581,8 +563,7 @@ export function RestaurantProvider({ children }) {
       deleteTable,
       orders,
       submitCustomerOrder,
-      updateOrderStatus,
-      recordPayment,
+      markOrderBilled,
       generateBill,
       soundEnabled,
       setSoundEnabled,

@@ -9,7 +9,8 @@ import {
   UtensilsCrossed, 
   Receipt, 
   ArrowRight,
-  MessageSquare
+  MessageSquare,
+  Clock
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useCart } from '../../context/CartContext';
@@ -26,9 +27,9 @@ export default function CustomerCartPage() {
     updateQuantity, 
     removeItem, 
     updateItemInstructions,
-    clearCart,
+    clearCart, 
     tableInfo, 
-    setTableInfo,
+    setTableInfo, 
     calculateTotals 
   } = useCart();
 
@@ -52,7 +53,7 @@ export default function CustomerCartPage() {
           </div>
           <h2 className="font-serif font-bold text-2xl text-charcoal-900">Your cart is empty</h2>
           <p className="text-sm text-charcoal-700/80 mt-1 max-w-xs mx-auto">
-            You haven't added any delicious food or drinks yet.
+            You haven't added any dishes yet.
           </p>
           <Link 
             to={`/r/${restaurantSlug}`}
@@ -64,7 +65,7 @@ export default function CustomerCartPage() {
         </main>
 
         <footer className="py-4 text-center text-xs text-charcoal-700/60">
-          {restaurant.name} &bull; Dine-In Digital Ordering
+          {restaurant.name} &bull; Dine-In Digital Menu
         </footer>
       </div>
     );
@@ -97,6 +98,24 @@ export default function CustomerCartPage() {
       </header>
 
       <main className="max-w-xl mx-auto px-4 py-4 space-y-4">
+        {/* Estimated Waiting Time Banner */}
+        <div className="bg-forest-800 text-white rounded-2xl p-4 shadow-soft flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-forest-700 border border-forest-600 flex items-center justify-center text-gold-400">
+              <Clock className="w-5 h-5" />
+            </div>
+            <div>
+              <span className="text-[11px] text-forest-200 font-medium uppercase tracking-wider block">Estimated Waiting Time</span>
+              <span className="font-serif font-bold text-lg text-white">
+                ~{totals.estimatedOrderWaitTime || 10} Minutes
+              </span>
+            </div>
+          </div>
+          <span className="text-[11px] bg-forest-700 px-2.5 py-1 rounded-full text-gold-300 font-bold border border-forest-600">
+            Freshly prepared
+          </span>
+        </div>
+
         {/* Table Assignment Card */}
         <div className="bg-white rounded-2xl p-4 border border-cream-200 shadow-soft">
           <div className="flex items-center justify-between mb-2">
@@ -134,7 +153,7 @@ export default function CustomerCartPage() {
           ) : (
             <div className="space-y-2">
               <p className="text-xs text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                Please select which table you are seated at:
+                Please select your table number:
               </p>
               <select 
                 onChange={(e) => {
@@ -177,9 +196,15 @@ export default function CustomerCartPage() {
                       <h3 className="font-serif font-bold text-sm text-charcoal-900 leading-snug truncate">
                         {item.name}
                       </h3>
-                      <p className="text-xs text-charcoal-700/70 font-medium">
-                        {formatCurrency(item.price, currency)} each
-                      </p>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-xs text-charcoal-700/70 font-medium">
+                          {formatCurrency(item.price, currency)} each
+                        </span>
+                        <span className="text-[10px] text-forest-700 font-semibold bg-forest-50 px-1.5 py-0.2 rounded border border-forest-100 flex items-center gap-0.5">
+                          <Clock className="w-2.5 h-2.5" />
+                          <span>{item.prepTime || 10}m prep</span>
+                        </span>
+                      </div>
                     </div>
                   </div>
 
@@ -227,7 +252,7 @@ export default function CustomerCartPage() {
                       type="text"
                       value={item.specialInstructions || ''}
                       onChange={(e) => updateItemInstructions(item.id, e.target.value)}
-                      placeholder="Special note (e.g., less sugar, extra spicy)..."
+                      placeholder="Special note (e.g. less sugar, extra crispy)..."
                       maxLength={70}
                       className="w-full text-xs bg-cream-50/80 border border-cream-200 rounded px-2 py-1 focus:bg-white focus:outline-none focus:ring-1 focus:ring-forest-600"
                     />
@@ -243,7 +268,7 @@ export default function CustomerCartPage() {
               className="text-xs font-bold text-forest-700 hover:underline flex items-center gap-1"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Add more items from menu</span>
+              <span>Add more dishes</span>
             </Link>
           </div>
         </div>
@@ -252,7 +277,7 @@ export default function CustomerCartPage() {
         <div className="bg-white rounded-2xl p-4 border border-cream-200 shadow-soft space-y-3">
           <h2 className="text-sm font-bold font-serif text-charcoal-900 flex items-center gap-2 border-b border-cream-200 pb-2">
             <Receipt className="w-4 h-4 text-forest-700" />
-            <span>Bill Details</span>
+            <span>Bill Amount</span>
           </h2>
 
           <div className="space-y-1.5 text-xs text-charcoal-700">
@@ -268,32 +293,22 @@ export default function CustomerCartPage() {
               </div>
             )}
 
-            {totals.cGstRate > 0 && (
+            {totals.totalTax > 0 && (
               <div className="flex justify-between text-charcoal-700/80">
-                <span>CGST ({totals.cGstRate}%)</span>
-                <span>{formatCurrency(totals.cGstAmount, currency)}</span>
-              </div>
-            )}
-
-            {totals.sGstRate > 0 && (
-              <div className="flex justify-between text-charcoal-700/80">
-                <span>SGST ({totals.sGstRate}%)</span>
-                <span>{formatCurrency(totals.sGstAmount, currency)}</span>
-              </div>
-            )}
-
-            {totals.serviceChargeAmount > 0 && (
-              <div className="flex justify-between text-charcoal-700/80">
-                <span>Service Charge ({totals.serviceChargeRate}%)</span>
-                <span>{formatCurrency(totals.serviceChargeAmount, currency)}</span>
+                <span>Taxes (CGST + SGST)</span>
+                <span>{formatCurrency(totals.totalTax, currency)}</span>
               </div>
             )}
 
             <div className="pt-2 border-t border-cream-200 flex justify-between items-baseline text-sm font-bold text-charcoal-900">
-              <span className="text-base font-serif">Grand Total</span>
+              <span className="font-serif">Grand Total</span>
               <span className="text-lg font-serif text-forest-800">{formatCurrency(totals.grandTotal, currency)}</span>
             </div>
           </div>
+          
+          <p className="text-[11px] text-charcoal-600 bg-cream-50 p-2 rounded-lg border border-cream-200 text-center font-medium">
+            Pay directly at the counter after your meal.
+          </p>
         </div>
       </main>
 
@@ -301,7 +316,7 @@ export default function CustomerCartPage() {
       <footer className="fixed bottom-0 left-0 right-0 z-40 p-3 sm:p-4 bg-white/95 backdrop-blur-md border-t border-cream-200 shadow-elevated">
         <div className="max-w-xl mx-auto flex items-center justify-between gap-4">
           <div>
-            <div className="text-[11px] text-charcoal-700/70 font-semibold uppercase tracking-wider">To Pay</div>
+            <div className="text-[11px] text-charcoal-700/70 font-semibold uppercase tracking-wider">Bill Total</div>
             <div className="text-xl font-bold font-serif text-forest-800">
               {formatCurrency(totals.grandTotal, currency)}
             </div>
@@ -317,7 +332,7 @@ export default function CustomerCartPage() {
             }}
             className="flex-1 py-3 px-6 bg-forest-700 hover:bg-forest-800 text-white font-bold rounded-xl shadow-md transition flex items-center justify-center gap-2 text-sm sm:text-base active:scale-98"
           >
-            <span>Proceed to Checkout</span>
+            <span>Confirm Order</span>
             <ArrowRight className="w-4 h-4 stroke-[2.5]" />
           </button>
         </div>
