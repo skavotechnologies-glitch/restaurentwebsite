@@ -6,18 +6,15 @@ import {
   UtensilsCrossed, 
   Clock, 
   ArrowRight, 
-  Phone,
-  ChefHat,
   Receipt,
   Layers,
   ChevronDown,
   ChevronUp,
-  Sparkles,
   ShoppingBag
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useCart } from '../../context/CartContext';
-import { formatCurrency, formatDateTime, formatTime } from '../../utils/formatters';
+import { formatCurrency } from '../../utils/formatters';
 
 export default function CustomerOrderSuccessPage() {
   const { restaurantSlug = 'naachi-cafe', orderId } = useParams();
@@ -43,31 +40,27 @@ export default function CustomerOrderSuccessPage() {
     } catch (e) {}
   }, []);
 
-  // Find all orders placed for this table session (consolidating all rounds)
+  // Find all orders placed for this table session
   const tableOrders = useMemo(() => {
     const targetTableId = order?.tableId || tableInfo?.id;
     const targetTableName = order?.tableName || tableInfo?.name;
     const targetPhone = order?.customerPhone || customerInfo?.phone;
 
     const matched = orders.filter(o => {
-      // 1. If in this device's session orders
       if (sessionOrderIds?.includes(o.id) || sessionOrderIds?.includes(o.orderNumber)) {
         return true;
       }
-      // 2. If table matches
       const isSameTable = (
         (targetTableId && o.tableId === targetTableId) ||
         (targetTableName && o.tableName?.toLowerCase() === targetTableName.toLowerCase())
       );
 
       if (isSameTable) {
-        // If phone matches, 100% certainty
         if (targetPhone && o.customerPhone) {
           const p1 = targetPhone.replace(/\D/g, '');
           const p2 = o.customerPhone.replace(/\D/g, '');
           if (p1 && p2 && p1 === p2) return true;
         }
-        // If placed in same dining session (last 6 hours)
         if (o.createdAt) {
           const diffHours = (Date.now() - new Date(o.createdAt).getTime()) / (1000 * 60 * 60);
           if (diffHours < 6) return true;
@@ -179,7 +172,7 @@ export default function CustomerOrderSuccessPage() {
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
-              <span>Latest Food Wait Time</span>
+              <span>Latest Wait Time</span>
             </button>
           </div>
         )}
