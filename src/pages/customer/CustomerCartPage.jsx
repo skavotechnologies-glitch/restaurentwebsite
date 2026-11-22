@@ -11,7 +11,8 @@ import {
   ArrowRight,
   MessageSquare,
   Clock,
-  Layers
+  Layers,
+  Lock
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useCart } from '../../context/CartContext';
@@ -173,66 +174,31 @@ export default function CustomerCartPage() {
           </span>
         </div>
 
-        {/* Table Assignment Card */}
+        {/* Table Assignment Card (Fixed to QR) */}
         <div className="bg-white rounded-2xl p-4 border border-cream-200 shadow-soft">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold uppercase tracking-wider text-charcoal-700/70 flex items-center gap-1.5">
               <UtensilsCrossed className="w-3.5 h-3.5 text-forest-700" />
               <span>Dine-In Table</span>
             </span>
+            <span className="text-[11px] bg-forest-50 text-forest-800 font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 border border-forest-200">
+              <Lock className="w-3 h-3 text-forest-700" />
+              <span>Locked to Table QR</span>
+            </span>
           </div>
 
-          {tableInfo ? (
-            <div className="flex items-center justify-between bg-forest-50 border border-forest-200 p-2.5 rounded-xl">
-              <div>
-                <span className="text-xs text-forest-700 font-medium block">Ordering for:</span>
-                <span className="text-base font-bold text-forest-900">{tableInfo.name}</span>
-              </div>
-              <select 
-                value={tableInfo.id}
-                onChange={(e) => {
-                  const selected = tables.find(t => t.id === e.target.value);
-                  if (selected) {
-                    setTableInfo({
-                      id: selected.id,
-                      name: selected.name,
-                      tableNumber: selected.tableNumber
-                    });
-                  }
-                }}
-                className="text-xs bg-white border border-forest-300 rounded-lg px-2.5 py-1.5 font-semibold text-forest-800 focus:outline-none focus:ring-1 focus:ring-forest-600"
-              >
-                {tables.map(t => (
-                  <option key={t.id} value={t.id}>Change to {t.name}</option>
-                ))}
-              </select>
+          <div className="flex items-center justify-between bg-forest-50/70 border border-forest-200 p-3 rounded-xl">
+            <div>
+              <span className="text-[11px] text-forest-700 font-medium block">Ordering for:</span>
+              <span className="text-base font-bold text-forest-900">
+                {tableInfo?.name || (tables[0]?.name || 'Table 1')}
+              </span>
             </div>
-          ) : (
-            <div className="space-y-2">
-              <p className="text-xs text-amber-800 bg-amber-50 p-2 rounded-lg border border-amber-200">
-                Please select your table number:
-              </p>
-              <select 
-                onChange={(e) => {
-                  const selected = tables.find(t => t.id === e.target.value);
-                  if (selected) {
-                    setTableInfo({
-                      id: selected.id,
-                      name: selected.name,
-                      tableNumber: selected.tableNumber
-                    });
-                  }
-                }}
-                defaultValue=""
-                className="w-full text-sm bg-cream-50 border border-cream-300 rounded-xl p-2.5 font-medium text-charcoal-900 focus:outline-none focus:ring-2 focus:ring-forest-600"
-              >
-                <option value="" disabled>-- Select Your Table --</option>
-                {tables.map(t => (
-                  <option key={t.id} value={t.id}>{t.name} (Capacity: {t.capacity} guests)</option>
-                ))}
-              </select>
+            <div className="text-right">
+              <span className="text-[10px] uppercase font-bold text-forest-700 tracking-wider block">Assigned Table</span>
+              <span className="text-xs text-charcoal-600 font-medium">Automatic from QR</span>
             </div>
-          )}
+          </div>
         </div>
 
         {/* Cart Items List */}
@@ -381,9 +347,12 @@ export default function CustomerCartPage() {
 
           <button
             onClick={() => {
-              if (!tableInfo) {
-                alert('Please select your table number first.');
-                return;
+              if (!tableInfo && tables && tables.length > 0) {
+                setTableInfo({
+                  id: tables[0].id,
+                  name: tables[0].name,
+                  tableNumber: tables[0].tableNumber
+                });
               }
               navigate(`/r/${restaurantSlug}/checkout`);
             }}

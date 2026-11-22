@@ -9,7 +9,8 @@ import {
   Loader2, 
   CheckCircle2, 
   Clock, 
-  AlertCircle 
+  AlertCircle,
+  Lock 
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useCart } from '../../context/CartContext';
@@ -53,9 +54,6 @@ export default function CustomerCheckoutPage() {
     if (!phoneRegex.test(cleanPhone)) {
       return 'Please enter a valid 10-digit Indian mobile number.';
     }
-    if (!tableInfo || !tableInfo.id) {
-      return 'Please select your table.';
-    }
     if (cartItems.length === 0) {
       return 'Your cart is empty.';
     }
@@ -81,12 +79,14 @@ export default function CustomerCheckoutPage() {
         instructions: instructions.trim()
       });
 
+      const effectiveTable = tableInfo || (tables && tables.length > 0 ? tables[0] : { id: 'T01', name: 'Table 1' });
+
       // Submit order to reception laptop with calculated waiting time
       const result = await submitCustomerOrder({
         customerName: name.trim(),
         customerPhone: phone.trim(),
-        tableId: tableInfo.id,
-        tableName: tableInfo.name,
+        tableId: effectiveTable.id,
+        tableName: effectiveTable.name,
         items: cartItems,
         specialInstructions: instructions.trim()
       });
@@ -208,29 +208,28 @@ export default function CustomerCheckoutPage() {
             </div>
 
             <div>
-              <label className="block text-xs font-bold text-charcoal-700 mb-1">
-                Dine-In Table <span className="text-rose-500">*</span>
+              <label className="block text-xs font-bold text-charcoal-700 mb-1 flex items-center justify-between">
+                <span>Dine-In Table</span>
+                <span className="text-[11px] font-semibold text-forest-700 flex items-center gap-1 bg-forest-50 px-2 py-0.5 rounded-full border border-forest-200">
+                  <Lock className="w-3 h-3 text-forest-700" />
+                  <span>Locked to Table QR</span>
+                </span>
               </label>
-              <div className="relative">
-                <UtensilsCrossed className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-700/50" />
-                <select
-                  value={tableInfo?.id || ''}
-                  onChange={(e) => {
-                    const selected = tables.find(t => t.id === e.target.value);
-                    if (selected) {
-                      setTableInfo({
-                        id: selected.id,
-                        name: selected.name,
-                        tableNumber: selected.tableNumber
-                      });
-                    }
-                  }}
-                  className="w-full pl-9 pr-8 py-2.5 text-sm bg-cream-50 border border-cream-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 font-semibold text-charcoal-900"
-                >
-                  {tables.map(t => (
-                    <option key={t.id} value={t.id}>{t.name}</option>
-                  ))}
-                </select>
+              <div className="flex items-center justify-between p-3 bg-forest-50/70 border border-forest-200 rounded-xl">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-forest-700 text-gold-400 flex items-center justify-center font-bold">
+                    <UtensilsCrossed className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[11px] text-charcoal-600 block font-medium">Assigned Table</span>
+                    <span className="text-sm font-bold text-forest-900">
+                      {tableInfo?.name || (tables[0]?.name || 'Table 1')}
+                    </span>
+                  </div>
+                </div>
+                <span className="text-[10px] font-bold bg-white text-forest-800 px-2.5 py-1 rounded-md border border-forest-300">
+                  Fixed Table
+                </span>
               </div>
             </div>
 
