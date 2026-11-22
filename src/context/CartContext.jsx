@@ -18,6 +18,26 @@ export function CartProvider({ children }) {
     return saved ? JSON.parse(saved) : { name: '', phone: '', instructions: '' };
   });
 
+  // Track all order IDs placed in this customer's dining session
+  const [sessionOrderIds, setSessionOrderIds] = useState(() => {
+    const saved = localStorage.getItem('qr_restaurant_session_orders');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const addSessionOrder = (orderId) => {
+    if (!orderId) return;
+    setSessionOrderIds(prev => {
+      const updated = prev.includes(orderId) ? prev : [...prev, orderId];
+      localStorage.setItem('qr_restaurant_session_orders', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const clearSessionOrders = () => {
+    setSessionOrderIds([]);
+    localStorage.removeItem('qr_restaurant_session_orders');
+  };
+
   useEffect(() => {
     localStorage.setItem('qr_restaurant_cart', JSON.stringify(cartItems));
   }, [cartItems]);
@@ -154,6 +174,9 @@ export function CartProvider({ children }) {
       setTableInfo,
       customerInfo,
       setCustomerInfo,
+      sessionOrderIds,
+      addSessionOrder,
+      clearSessionOrders,
       addToCart,
       updateQuantity,
       updateItemInstructions,

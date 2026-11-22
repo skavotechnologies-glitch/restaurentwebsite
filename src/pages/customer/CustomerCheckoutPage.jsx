@@ -26,6 +26,7 @@ export default function CustomerCheckoutPage() {
     setTableInfo, 
     customerInfo, 
     setCustomerInfo, 
+    addSessionOrder,
     clearCart, 
     calculateTotals 
   } = useCart();
@@ -91,6 +92,7 @@ export default function CustomerCheckoutPage() {
       });
 
       if (result.success) {
+        addSessionOrder(result.orderId);
         clearCart();
         navigate(`/r/${restaurantSlug}/order-success/${result.orderId}`, {
           state: { order: result.order }

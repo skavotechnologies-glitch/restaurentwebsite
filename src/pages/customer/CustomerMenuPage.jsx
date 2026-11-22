@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
-import { Search, X, Filter, Flame, AlertCircle } from 'lucide-react';
+import { Search, X, Filter, Flame, AlertCircle, Receipt, ArrowRight, Clock } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useCart } from '../../context/CartContext';
+import { formatCurrency } from '../../utils/formatters';
 import RestaurantHeader from '../../components/customer/RestaurantHeader';
 import CategoryNav from '../../components/customer/CategoryNav';
 import MenuItemCard from '../../components/customer/MenuItemCard';
@@ -12,7 +13,7 @@ import VegNonVegIcon from '../../components/common/VegNonVegIcon';
 export default function CustomerMenuPage() {
   const { restaurantSlug = 'naachi-cafe' } = useParams();
   const [searchParams] = useSearchParams();
-  const { restaurant, categories, menuItems, tables } = useRestaurant();
+  const { restaurant, categories, menuItems, tables, orders } = useRestaurant();
   const { 
     cartItems, 
     totalItemCount, 
@@ -22,7 +23,8 @@ export default function CustomerMenuPage() {
     updateItemInstructions,
     getItemQuantity,
     tableInfo,
-    setTableInfo 
+    setTableInfo,
+    sessionOrderIds 
   } = useCart();
 
   const [activeCategory, setActiveCategory] = useState('all');
@@ -115,11 +117,63 @@ export default function CustomerMenuPage() {
   }, [categories, filteredItems, activeCategory, searchQuery, filterType]);
 
   const isOrderingDisabled = !restaurant.isOpen || restaurant.onlineOrderingEnabled === false;
+  const currency = restaurant.billing?.currency || '₹';
+
+  // Active table orders for this dining session
+  const activeTableOrders = useMemo(() => {
+    if (!tableInfo?.id && (!sessionOrderIds || sessionOrderIds.length === 0)) return [];
+    return orders.filter(o => {
+      if (sessionOrderIds?.includes(o.id) || sessionOrderIds?.includes(o.orderNumber)) return true;
+      if (tableInfo?.id && (o.tableId === tableInfo.id || o.tableName?.toLowerCase() === tableInfo.name?.toLowerCase())) {
+        if (o.createdAt) {
+          const diffHours = (Date.now() - new Date(o.createdAt).getTime()) / (1000 * 60 * 60);
+          if (diffHours < 6) return true;
+        }
+      }
+      return false;
+    }).sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
+  }, [orders, tableInfo, sessionOrderIds]);
+
+  const activeTableGrandTotal = useMemo(() => {
+    return activeTableOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+  }, [activeTableOrders]);
 
   return (
     <div className="min-h-screen bg-cream-100 pb-28 text-charcoal-900">
       {/* Restaurant Header */}
       <RestaurantHeader restaurant={restaurant} currentTable={tableInfo} />
+
+      {/* Running Table Bill Banner if customer has active orders */}
+      {activeTableOrders.length > 0 && (
+        <div className="max-w-4xl mx-auto px-4 -mt-2 mb-3">
+          <Link
+            to={`/order/${activeTableOrders[activeTableOrders.length - 1].id}`}
+            className="w-full bg-forest-800 hover:bg-forest-900 text-white p-3 rounded-2xl shadow-elevated border border-forest-600 flex items-center justify-between transition group"
+          >
+            <div className="flex items-center gap-2.5">
+              <div className="w-8 h-8 rounded-xl bg-forest-700 border border-forest-500 text-gold-400 flex items-center justify-center font-bold">
+                <Receipt className="w-4 h-4 text-gold-400" />
+              </div>
+              <div className="text-left">
+                <div className="text-[11px] text-forest-200 font-semibold uppercase tracking-wider">
+                  {tableInfo?.name || 'Your Table'} &bull; {activeTableOrders.length} {activeTableOrders.length === 1 ? 'Order Placed' : 'Orders Placed'}
+                </div>
+                <div className="text-sm font-serif font-bold text-white flex items-center gap-1.5">
+                  <span>Running Bill: {formatCurrency(activeTableGrandTotal, currency)}</span>
+                  <span className="text-[10px] font-sans text-gold-400 bg-forest-700/80 px-2 py-0.5 rounded-full border border-forest-500">
+                    Consolidated
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5 text-xs font-bold text-gold-400 group-hover:translate-x-0.5 transition">
+              <span>View Full Bill</span>
+              <ArrowRight className="w-4 h-4" />
+            </div>
+          </Link>
+        </div>
+      )}
 
       {/* Sticky Category Navigation */}
       <CategoryNav 
