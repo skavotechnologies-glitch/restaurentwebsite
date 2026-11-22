@@ -110,7 +110,20 @@ export function RestaurantProvider({ children }) {
             return new Set(fetchedOrders.map(o => o.id));
           });
 
-          setOrders(fetchedOrders);
+          // Seamless merge: ensure freshly placed in-flight local orders are not prematurely dropped
+          setOrders((currentOrders) => {
+            const remoteMap = new Map(fetchedOrders.map(o => [o.id, o]));
+            const pendingLocalOrders = currentOrders.filter(localOrder => {
+              if (remoteMap.has(localOrder.id)) return false;
+              if (localOrder.createdAt) {
+                const ageSeconds = (Date.now() - new Date(localOrder.createdAt).getTime()) / 1000;
+                return ageSeconds < 60; // Keep local order if created within last 60s
+              }
+              return false;
+            });
+
+            return [...pendingLocalOrders, ...fetchedOrders];
+          });
         }, (err) => {
           console.warn('Firestore orders onSnapshot warning:', err);
         });
@@ -307,19 +320,16 @@ export function RestaurantProvider({ children }) {
       playOrderAlert();
     }
 
-    // 5. Cloud Firestore synchronization (non-blocking fast race to prevent freezing)
+    // 5. Cloud Firestore synchronization (reliable real-time cloud write)
     if (isFirebaseConfigured && db) {
       try {
         const orderDocRef = doc(db, 'restaurants', activeSlug, 'orders', orderId);
-        // Fast race: Attempt cloud save, but do NOT freeze the user if Google Cloud connection is slow or pending
-        Promise.race([
+        await Promise.race([
           setDoc(orderDocRef, newOrder),
-          new Promise((resolve) => setTimeout(resolve, 350))
-        ]).catch(err => {
-          console.warn('Firestore cloud order sync notice:', err);
-        });
+          new Promise((resolve) => setTimeout(resolve, 1500))
+        ]);
       } catch (err) {
-        console.warn('Firestore order write error:', err);
+        console.warn('Firestore cloud order sync notice:', err);
       }
     }
 
@@ -346,12 +356,10 @@ export function RestaurantProvider({ children }) {
     if (isFirebaseConfigured && db) {
       try {
         const orderRef = doc(db, 'restaurants', activeSlug, 'orders', orderId);
-        Promise.race([
+        await Promise.race([
           updateDoc(orderRef, updatePayload),
-          new Promise((resolve) => setTimeout(resolve, 350))
-        ]).catch(err => {
-          console.warn('Firestore markOrderBilled sync notice:', err);
-        });
+          new Promise((resolve) => setTimeout(resolve, 1500))
+        ]);
       } catch (err) {
         console.warn('Firestore markOrderBilled error:', err);
       }

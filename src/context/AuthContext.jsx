@@ -60,7 +60,29 @@ export function AuthProvider({ children }) {
     setLoading(true);
 
     try {
-      // 1. Check for Demo Admin Credentials
+      // 1. Try real Firebase Auth first when configured
+      if (isFirebaseConfigured && auth) {
+        try {
+          const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
+          const userData = {
+            uid: cred.user.uid,
+            email: cred.user.email,
+            displayName: cred.user.displayName || 'Naachi Café Manager',
+            restaurantId: 'naachi-cafe',
+            role: 'admin',
+            isDemo: false
+          };
+          setUser(userData);
+          localStorage.setItem('qr_restaurant_admin_user', JSON.stringify(userData));
+          setLoading(false);
+          return { success: true, user: userData };
+        } catch (firebaseErr) {
+          console.warn('Firebase signIn notice:', firebaseErr.code, firebaseErr.message);
+          // If password was wrong or auth error, don't fall back to demo unless it matches standard demo credentials
+        }
+      }
+
+      // 2. Demo Admin Credentials fallback
       if (
         (email.toLowerCase() === 'admin@naachicafe.com' && password === 'admin123') ||
         (email.toLowerCase() === 'admin@restaurant.com' && password === 'admin123') ||
@@ -80,25 +102,8 @@ export function AuthProvider({ children }) {
         return { success: true, user: demoUser };
       }
 
-      // 2. Real Firebase Auth if configured
-      if (isFirebaseConfigured && auth) {
-        const cred = await signInWithEmailAndPassword(auth, email, password);
-        const userData = {
-          uid: cred.user.uid,
-          email: cred.user.email,
-          displayName: cred.user.displayName || 'Staff Admin',
-          restaurantId: 'naachi-cafe',
-          role: 'admin',
-          isDemo: false
-        };
-        setUser(userData);
-        localStorage.setItem('qr_restaurant_admin_user', JSON.stringify(userData));
-        setLoading(false);
-        return { success: true, user: userData };
-      }
-
       // If credentials didn't match demo and Firebase is not configured
-      throw new Error('Invalid email or password. Use demo account: admin@naachicafe.com / admin123 or configure Firebase.');
+      throw new Error('Invalid email or password. Use account: admin@naachicafe.com / admin123.');
     } catch (err) {
       setLoading(false);
       const msg = err.code ? getFirebaseErrorMessage(err.code) : err.message;

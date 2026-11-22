@@ -13,6 +13,8 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID || "G-27EWC16EBK"
 };
 
+export const databaseId = import.meta.env.VITE_FIREBASE_DATABASE_ID || "default";
+
 export const isFirebaseConfigured = Boolean(
   firebaseConfig.apiKey &&
   firebaseConfig.apiKey !== "your_api_key_here" &&
@@ -29,9 +31,10 @@ if (isFirebaseConfigured) {
   try {
     app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
     auth = getAuth(app);
-    db = getFirestore(app);
+    // Explicitly target database 'default' (as named in Firestore console)
+    db = getFirestore(app, databaseId);
     storage = getStorage(app);
-    console.log("Firebase initialized successfully with project:", firebaseConfig.projectId);
+    console.log("Firebase initialized successfully with project:", firebaseConfig.projectId, "database:", databaseId);
   } catch (error) {
     console.error("Firebase initialization failed:", error);
   }
