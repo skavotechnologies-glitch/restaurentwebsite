@@ -295,17 +295,7 @@ export function RestaurantProvider({ children }) {
       updatedAt: now.toISOString()
     };
 
-    // 4. Save to Firestore or Local Storage
-    if (isFirebaseConfigured && db) {
-      try {
-        const orderDocRef = doc(db, 'restaurants', activeSlug, 'orders', orderId);
-        await setDoc(orderDocRef, newOrder);
-      } catch (err) {
-        console.error('Firestore order write error:', err);
-      }
-    }
-
-    // Update local state & broadcast to reception laptop
+    // 4. Optimistically update local state & broadcast to reception laptop IMMEDIATELY
     setOrders(prev => [newOrder, ...prev]);
     setSeenOrderIds(prev => new Set([...prev, orderId]));
 
@@ -315,6 +305,22 @@ export function RestaurantProvider({ children }) {
 
     if (soundEnabled) {
       playOrderAlert();
+    }
+
+    // 5. Cloud Firestore synchronization (non-blocking fast race to prevent freezing)
+    if (isFirebaseConfigured && db) {
+      try {
+        const orderDocRef = doc(db, 'restaurants', activeSlug, 'orders', orderId);
+        // Fast race: Attempt cloud save, but do NOT freeze the user if Google Cloud connection is slow or pending
+        Promise.race([
+          setDoc(orderDocRef, newOrder),
+          new Promise((resolve) => setTimeout(resolve, 350))
+        ]).catch(err => {
+          console.warn('Firestore cloud order sync notice:', err);
+        });
+      } catch (err) {
+        console.warn('Firestore order write error:', err);
+      }
     }
 
     return {
@@ -334,16 +340,22 @@ export function RestaurantProvider({ children }) {
       updatedAt: timestamp
     };
 
+    // Optimistically update local state immediately
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatePayload } : o));
+
     if (isFirebaseConfigured && db) {
       try {
         const orderRef = doc(db, 'restaurants', activeSlug, 'orders', orderId);
-        await updateDoc(orderRef, updatePayload);
+        Promise.race([
+          updateDoc(orderRef, updatePayload),
+          new Promise((resolve) => setTimeout(resolve, 350))
+        ]).catch(err => {
+          console.warn('Firestore markOrderBilled sync notice:', err);
+        });
       } catch (err) {
         console.warn('Firestore markOrderBilled error:', err);
       }
     }
-
-    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatePayload } : o));
   };
 
   // Generate / Reprint Bill & Kitchen Order Ticket (KOT)
