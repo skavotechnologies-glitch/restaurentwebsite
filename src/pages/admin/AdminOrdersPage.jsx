@@ -125,6 +125,14 @@ export default function AdminOrdersPage() {
         });
       });
 
+      // Compute earliest and latest active order timestamps for this table
+      const orderTimestamps = customers.flatMap(c => 
+        c.rounds.map(r => new Date(r.createdAt || 0).getTime())
+      ).filter(t => !isNaN(t) && t > 0);
+
+      const earliestOrderTime = orderTimestamps.length > 0 ? Math.min(...orderTimestamps) : Infinity;
+      const latestOrderTime = orderTimestamps.length > 0 ? Math.max(...orderTimestamps) : 0;
+
       return {
         tableId: table.id,
         tableName: table.name || `Table ${table.tableNumber}`,
@@ -132,7 +140,9 @@ export default function AdminOrdersPage() {
         customers,
         isOccupied: customers.length > 0,
         hasUnbilled: customers.some(c => c.hasUnbilled),
-        totalActiveGuests: customers.length
+        totalActiveGuests: customers.length,
+        earliestOrderTime,
+        latestOrderTime
       };
     });
 
@@ -194,6 +204,13 @@ export default function AdminOrdersPage() {
           });
         });
 
+        const orderTimestamps = customers.flatMap(c => 
+          c.rounds.map(r => new Date(r.createdAt || 0).getTime())
+        ).filter(t => !isNaN(t) && t > 0);
+
+        const earliestOrderTime = orderTimestamps.length > 0 ? Math.min(...orderTimestamps) : Infinity;
+        const latestOrderTime = orderTimestamps.length > 0 ? Math.max(...orderTimestamps) : 0;
+
         mappedTables.push({
           tableId: `extra-${tName}`,
           tableName: tName,
@@ -201,12 +218,41 @@ export default function AdminOrdersPage() {
           customers,
           isOccupied: customers.length > 0,
           hasUnbilled: customers.some(c => c.hasUnbilled),
-          totalActiveGuests: customers.length
+          totalActiveGuests: customers.length,
+          earliestOrderTime,
+          latestOrderTime
         });
       });
     }
 
-    return mappedTables;
+    // First-come, first-served priority sorting:
+    // 1. Occupied tables with active orders ALWAYS appear FIRST (at the top).
+    // 2. Among occupied tables:
+    //    a) Tables with unbilled rounds needing kitchen bill are prioritized.
+    //    b) First-come, first-served (FIFO: earliest active order timestamp first).
+    // 3. Available/vacant tables appear after occupied tables, sorted numerically (Table 1, Table 2, ...).
+    return mappedTables.sort((a, b) => {
+      // 1. Occupied tables come before available tables
+      if (a.isOccupied !== b.isOccupied) {
+        return a.isOccupied ? -1 : 1;
+      }
+
+      // 2. Both tables have active orders
+      if (a.isOccupied && b.isOccupied) {
+        // High priority: needs kitchen bill
+        if (a.hasUnbilled !== b.hasUnbilled) {
+          return a.hasUnbilled ? -1 : 1;
+        }
+
+        // First-come, first-served: table with earliest active order first
+        if (a.earliestOrderTime !== b.earliestOrderTime) {
+          return a.earliestOrderTime - b.earliestOrderTime;
+        }
+      }
+
+      // 3. Natural table ordering for available tables (Table 1, Table 2...)
+      return a.tableName.localeCompare(b.tableName, undefined, { numeric: true });
+    });
   }, [tables, activeUnpaidOrders]);
 
   // Filter tables according to search query and active tab
@@ -456,6 +502,7 @@ export default function AdminOrdersPage() {
       <div className="space-y-4">
         {filteredTableList.map(tableRow => {
           const { tableId, tableName, capacity, customers, isOccupied, hasUnbilled } = tableRow;
+          const occupiedQueueRank = isOccupied ? (filteredTableList.filter(t => t.isOccupied).indexOf(tableRow) + 1) : null;
 
           return (
             <div 
@@ -474,9 +521,16 @@ export default function AdminOrdersPage() {
                       <UtensilsCrossed className="w-4 h-4" />
                     </div>
                     <div>
-                      <h2 className="font-serif font-bold text-lg text-charcoal-900 leading-tight">
-                        {tableName}
-                      </h2>
+                      <div className="flex items-center gap-1.5">
+                        <h2 className="font-serif font-bold text-lg text-charcoal-900 leading-tight">
+                          {tableName}
+                        </h2>
+                        {occupiedQueueRank && (
+                          <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 whitespace-nowrap">
+                            Queue #{occupiedQueueRank}
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[11px] text-charcoal-500 font-medium">
                         Capacity: {capacity} Seats
                       </span>
