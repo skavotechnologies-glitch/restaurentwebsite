@@ -26,6 +26,27 @@ import { useRestaurant } from '../../context/RestaurantContext';
 import { formatCurrency, formatTime, formatDateTime } from '../../utils/formatters';
 import { generateUpiUri } from '../../utils/upi';
 
+// Robust helper to match orders to tables regardless of format (e.g. "T06", "6", "T6", "Table 6")
+const isOrderForTable = (order, table) => {
+  if (!order || !table) return false;
+  
+  const oTId = (order.tableId || '').toString().toLowerCase().trim();
+  const tId = (table.id || '').toString().toLowerCase().trim();
+  if (oTId && tId && oTId === tId) return true;
+
+  // Normalized table number comparison (e.g. T06 -> 6, T6 -> 6, 6 -> 6)
+  const oNum = oTId.replace(/^t0*/i, '');
+  const tNum = (table.tableNumber || tId.replace(/^t0*/i, '')).toString().toLowerCase().trim();
+  if (oNum && tNum && oNum === tNum) return true;
+
+  // Normalized table name comparison (e.g. "Table 6" -> "table6", "Table T06" -> "table6")
+  const oName = (order.tableName || '').toString().toLowerCase().replace(/[^a-z0-9]/g, '').replace(/t0*/g, '');
+  const tName = (table.name || `Table ${tNum}`).toString().toLowerCase().replace(/[^a-z0-9]/g, '').replace(/t0*/g, '');
+  if (oName && tName && (oName === tName || oName === `table${tNum}`)) return true;
+
+  return false;
+};
+
 export default function AdminOrdersPage() {
   const { restaurant, tables, orders, markOrderBilled, settleOrders, generateBill, clearAllOrders } = useRestaurant();
 
@@ -56,12 +77,8 @@ export default function AdminOrdersPage() {
   const tableDataList = useMemo(() => {
     // A. Map known tables from configuration
     const mappedTables = tables.map(table => {
-      // Find orders matching this table
-      const tableOrders = activeUnpaidOrders.filter(o => 
-        o.tableId === table.id || 
-        (o.tableName && table.name && o.tableName.toLowerCase() === table.name.toLowerCase()) ||
-        (table.tableNumber && o.tableName && o.tableName.toLowerCase() === `table ${table.tableNumber}`.toLowerCase())
-      );
+      // Find orders matching this table using robust matcher
+      const tableOrders = activeUnpaidOrders.filter(o => isOrderForTable(o, table));
 
       // Group active orders for this table by Customer (phone or name)
       const customerMap = new Map();
@@ -120,10 +137,8 @@ export default function AdminOrdersPage() {
     });
 
     // B. Check for any unmatched active orders (e.g. from custom/dynamic table names)
-    const knownTableIds = new Set(tables.map(t => t.id));
-    const knownTableNames = new Set(tables.map(t => t.name?.toLowerCase()));
     const unmappedOrders = activeUnpaidOrders.filter(o => 
-      !knownTableIds.has(o.tableId) && !knownTableNames.has(o.tableName?.toLowerCase())
+      !tables.some(table => isOrderForTable(o, table))
     );
 
     if (unmappedOrders.length > 0) {

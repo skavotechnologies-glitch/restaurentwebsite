@@ -17,7 +17,8 @@ import {
   Search,
   Eye,
   Layers,
-  Sparkles
+  Sparkles,
+  Smartphone
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 
@@ -45,8 +46,16 @@ export default function AdminTablesPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [copiedId, setCopiedId] = useState(null);
 
+  // Custom QR base host (e.g. Wi-Fi IP 192.168.0.16 or deployed domain) for physical phone camera scanning
+  const [customHost, setCustomHost] = useState(() => {
+    return localStorage.getItem('qr_restaurant_custom_host') || '';
+  });
+
+  const isLocalhost = typeof window !== 'undefined' && 
+    (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
   const getTableUrl = (table) => {
-    const origin = window.location.origin;
+    const origin = customHost.trim() || window.location.origin;
     return `${origin}/r/${activeSlug}?table=${table.id}`;
   };
 
@@ -171,6 +180,47 @@ export default function AdminTablesPage() {
           </button>
         </div>
       </div>
+
+      {/* Mobile Wi-Fi QR Scanning Helper */}
+      {isLocalhost && (
+        <div className="bg-amber-50 border border-amber-300 rounded-2xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs text-amber-950 shadow-sm">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <Smartphone className="w-5 h-5 text-amber-700 flex-shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <span className="font-bold block text-sm">Scanning QR with a real Mobile Phone?</span>
+              <span className="text-amber-800">
+                Mobile phones cannot reach "localhost". Use your network IP <strong>http://192.168.0.16:3000</strong> or your deployed domain in the QR codes.
+              </span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {customHost ? (
+              <button
+                type="button"
+                onClick={() => {
+                  setCustomHost('');
+                  localStorage.removeItem('qr_restaurant_custom_host');
+                }}
+                className="px-3 py-1.5 bg-white hover:bg-slate-100 text-charcoal-800 border border-slate-300 rounded-xl font-bold transition shadow-xs"
+              >
+                Reset to Localhost
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => {
+                  const netIp = `http://192.168.0.16:${window.location.port || 3000}`;
+                  setCustomHost(netIp);
+                  localStorage.setItem('qr_restaurant_custom_host', netIp);
+                }}
+                className="px-3.5 py-1.5 bg-amber-700 hover:bg-amber-800 text-white rounded-xl font-bold transition shadow-sm"
+              >
+                Use Wi-Fi IP (192.168.0.16) for QRs
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Summary KPI Badges */}
       <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">

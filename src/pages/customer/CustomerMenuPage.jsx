@@ -31,28 +31,36 @@ export default function CustomerMenuPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('all'); // 'all' | 'veg' | 'non-veg' | 'bestseller'
 
-  // Detect and set table from URL query params (e.g. ?table=T04 or ?table=4)
+  // Detect and set table from URL query params (e.g. ?table=T06, ?table=6, ?table=T6)
   useEffect(() => {
     const tableParam = searchParams.get('table');
     if (tableParam) {
-      const matchedTable = tables.find(t => 
-        t.id.toLowerCase() === tableParam.toLowerCase() || 
-        t.tableNumber === tableParam ||
-        t.name.toLowerCase() === `table ${tableParam}`.toLowerCase()
-      );
+      const cleanParam = tableParam.trim().toLowerCase();
+      const numParam = cleanParam.replace(/^t0*/i, '');
+
+      const matchedTable = tables.find(t => {
+        const tId = (t.id || '').toLowerCase();
+        const tNum = (t.tableNumber || tId.replace(/^t0*/i, '')).toLowerCase();
+        const tName = (t.name || '').toLowerCase();
+        return tId === cleanParam || 
+          tNum === numParam || 
+          tName === `table ${numParam}` ||
+          tName === cleanParam;
+      });
 
       if (matchedTable) {
         setTableInfo({
           id: matchedTable.id,
           name: matchedTable.name,
-          tableNumber: matchedTable.tableNumber
+          tableNumber: matchedTable.tableNumber || numParam
         });
       } else {
         // Fallback for custom or direct table numbers
+        const cleanName = numParam ? `Table ${numParam}` : `Table ${tableParam}`;
         setTableInfo({
           id: tableParam,
-          name: `Table ${tableParam}`,
-          tableNumber: tableParam
+          name: cleanName,
+          tableNumber: numParam || tableParam
         });
       }
     }

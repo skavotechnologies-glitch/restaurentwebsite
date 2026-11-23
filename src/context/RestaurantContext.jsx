@@ -113,13 +113,10 @@ export function RestaurantProvider({ children }) {
           const fetchedOrders = [];
           snapshot.forEach((doc) => {
             const data = doc.data();
-            const legacyDemoNames = ['balamurugan', 'testuser', 'probe', 'ramesh', 'guru', 'palani', 'hussain', 'ganapathy', 'priya sundaram', 'rohan sharma'];
-            const customerLower = (data.customerName || '').toLowerCase().trim();
-            const isDemo = ['ORD-1048', 'ORD-1047', 'ORD-1056', 'ORD-1057', 'ORD-1040', 'ORD-10000', 'ORD-10001', 'ORD-9999'].includes(doc.id) ||
-              ['ORD-1048', 'ORD-1047', 'ORD-1056', 'ORD-1057', 'ORD-1040', 'ORD-10000', 'ORD-10001', 'ORD-9999'].includes(data.orderNumber) ||
-              legacyDemoNames.includes(customerLower) ||
-              doc.id.startsWith('test-');
-            if (!isDemo) {
+            const isLegacyDemo = ['ORD-1048', 'ORD-1047', 'ORD-1040'].includes(doc.id) ||
+              ['ORD-1048', 'ORD-1047', 'ORD-1040'].includes(data.orderNumber) ||
+              doc.id.startsWith('test-probe-');
+            if (!isLegacyDemo) {
               fetchedOrders.push({ id: doc.id, ...data });
             }
           });
