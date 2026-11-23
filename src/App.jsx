@@ -15,7 +15,6 @@ import CustomerOrderTrackingPage from './pages/customer/CustomerOrderTrackingPag
 // Admin Pages
 import AdminLayout from './components/admin/AdminLayout';
 import AdminLoginPage from './pages/admin/AdminLoginPage';
-import AdminDashboardPage from './pages/admin/AdminDashboardPage';
 import AdminOrdersPage from './pages/admin/AdminOrdersPage';
 import AdminMenuPage from './pages/admin/AdminMenuPage';
 import AdminCategoriesPage from './pages/admin/AdminCategoriesPage';
@@ -46,13 +45,14 @@ export default function App() {
 
             {/* Protected Admin Portal with Sidebar Layout */}
             <Route path="/admin" element={<AdminLayout />}>
-              <Route index element={<Navigate to="/admin/dashboard" replace />} />
-              <Route path="dashboard" element={<AdminDashboardPage />} />
+              <Route index element={<Navigate to="/admin/orders" replace />} />
+              <Route path="dashboard" element={<Navigate to="/admin/orders" replace />} />
               <Route path="orders" element={<AdminOrdersPage />} />
               <Route path="orders/:orderId" element={<AdminOrdersPage />} />
               <Route path="menu" element={<AdminMenuPage />} />
               <Route path="categories" element={<AdminCategoriesPage />} />
               <Route path="tables" element={<AdminTablesPage />} />
+              <Route path="qrs" element={<AdminTablesPage />} />
               <Route path="billing" element={<AdminBillingPage />} />
               <Route path="history" element={<AdminHistoryPage />} />
               <Route path="analytics" element={<AdminAnalyticsPage />} />

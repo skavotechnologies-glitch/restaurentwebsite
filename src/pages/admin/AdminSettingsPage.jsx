@@ -52,6 +52,8 @@ export default function AdminSettingsPage() {
     serviceChargeRate: restaurant.billing?.serviceChargeRate !== undefined ? restaurant.billing.serviceChargeRate.toString() : '0',
     discountRate: restaurant.billing?.discountRate !== undefined ? restaurant.billing.discountRate.toString() : '0',
     gstin: restaurant.billing?.gstin || '',
+    upiId: restaurant.billing?.upiId || 'naachicafe@okaxis',
+    upiPayeeName: restaurant.billing?.upiPayeeName || restaurant.name || 'Naachi Café',
     billFooterMessage: restaurant.billing?.billFooterMessage || 'Thank you for dining with us! Please visit again.'
   });
 
@@ -84,6 +86,8 @@ export default function AdminSettingsPage() {
         serviceChargeRate: Number(formData.serviceChargeRate),
         discountRate: Number(formData.discountRate),
         gstin: formData.gstin.trim(),
+        upiId: formData.upiId.trim(),
+        upiPayeeName: formData.upiPayeeName.trim(),
         billFooterMessage: formData.billFooterMessage.trim()
       }
     };
@@ -401,6 +405,32 @@ export default function AdminSettingsPage() {
                 onChange={(e) => setFormData({ ...formData, gstin: e.target.value })}
                 placeholder="29AAAAA0000A1Z5"
                 className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-charcoal-700 mb-1">
+                Restaurant UPI ID / VPA (For Dynamic Payment QR)
+              </label>
+              <input 
+                type="text"
+                value={formData.upiId}
+                onChange={(e) => setFormData({ ...formData, upiId: e.target.value })}
+                placeholder="e.g. naachicafe@okaxis or 9876543210@paytm"
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 font-mono"
+              />
+            </div>
+
+            <div>
+              <label className="block text-xs font-bold text-charcoal-700 mb-1">
+                UPI Payee Display Name
+              </label>
+              <input 
+                type="text"
+                value={formData.upiPayeeName}
+                onChange={(e) => setFormData({ ...formData, upiPayeeName: e.target.value })}
+                placeholder="e.g. Naachi Café"
+                className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 font-semibold"
               />
             </div>
 

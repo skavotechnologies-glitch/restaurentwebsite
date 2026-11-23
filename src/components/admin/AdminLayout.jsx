@@ -24,15 +24,10 @@ import { useRestaurant } from '../../context/RestaurantContext';
 import { formatDate } from '../../utils/formatters';
 
 const NAV_ITEMS = [
-  { path: '/admin/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { path: '/admin/orders', label: 'Live Orders', icon: ShoppingBag, showBadge: true },
-  { path: '/admin/menu', label: 'Menu Items', icon: Utensils },
-  { path: '/admin/categories', label: 'Categories', icon: FolderTree },
-  { path: '/admin/tables', label: 'Tables & QR', icon: QrCode },
-  { path: '/admin/billing', label: 'Billing & POS', icon: Receipt },
+  { path: '/admin/orders', label: 'Orders', icon: ShoppingBag, showBadge: true },
+  { path: '/admin/tables', label: 'Table QRs', icon: QrCode },
   { path: '/admin/history', label: 'Order History', icon: History },
   { path: '/admin/analytics', label: 'Analytics', icon: BarChart3 },
-  { path: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 
 export default function AdminLayout() {

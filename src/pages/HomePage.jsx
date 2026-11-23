@@ -134,9 +134,6 @@ export default function HomePage() {
                 <span>Open Staff Portal</span>
                 <ArrowRight className="w-3.5 h-3.5" />
               </Link>
-              <div className="p-2 bg-gold-50/80 rounded-lg border border-gold-200/60 text-[11px] text-charcoal-800 text-center font-medium">
-                Demo: <span className="font-mono font-bold">admin@naachicafe.com</span> / <span className="font-mono font-bold">admin123</span>
-              </div>
             </div>
           </div>
         </div>

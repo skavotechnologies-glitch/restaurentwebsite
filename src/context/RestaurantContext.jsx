@@ -9,7 +9,7 @@ import {
   query, 
   orderBy 
 } from 'firebase/firestore';
-import { db, isFirebaseConfigured } from '../firebase/config';
+import { db, isFirebaseConfigured, ensureGuestAuth } from '../firebase/config';
 import { 
   DEMO_RESTAURANT, 
   DEMO_CATEGORIES, 
@@ -48,10 +48,17 @@ export function RestaurantProvider({ children }) {
     return saved ? JSON.parse(saved) : DEMO_TABLES;
   });
 
-  // Orders
+  // Orders (starts completely clean with 0 orders, purges all sample/demo orders)
   const [orders, setOrders] = useState(() => {
-    const saved = localStorage.getItem(`qr_orders_${activeSlug}`);
-    return saved ? JSON.parse(saved) : DEMO_ORDERS;
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('qr_orders_') || key.includes('session_orders') || key.includes('cart'))) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch {}
+    return [];
   });
 
   // Notification sound preference
@@ -88,6 +95,13 @@ export function RestaurantProvider({ children }) {
     localStorage.setItem('qr_notification_sound', JSON.stringify(soundEnabled));
   }, [soundEnabled]);
 
+  // Ensure guest session is authenticated on client startup
+  useEffect(() => {
+    if (isFirebaseConfigured) {
+      ensureGuestAuth().catch(() => {});
+    }
+  }, [isFirebaseConfigured]);
+
   // Real-time listener for Orders on reception laptop (Firebase or local event bus)
   useEffect(() => {
     if (isFirebaseConfigured && db) {
@@ -98,7 +112,16 @@ export function RestaurantProvider({ children }) {
         const unsubscribe = onSnapshot(q, (snapshot) => {
           const fetchedOrders = [];
           snapshot.forEach((doc) => {
-            fetchedOrders.push({ id: doc.id, ...doc.data() });
+            const data = doc.data();
+            const legacyDemoNames = ['balamurugan', 'testuser', 'probe', 'ramesh', 'guru', 'palani', 'hussain', 'ganapathy', 'priya sundaram', 'rohan sharma'];
+            const customerLower = (data.customerName || '').toLowerCase().trim();
+            const isDemo = ['ORD-1048', 'ORD-1047', 'ORD-1056', 'ORD-1057', 'ORD-1040', 'ORD-10000', 'ORD-10001', 'ORD-9999'].includes(doc.id) ||
+              ['ORD-1048', 'ORD-1047', 'ORD-1056', 'ORD-1057', 'ORD-1040', 'ORD-10000', 'ORD-10001', 'ORD-9999'].includes(data.orderNumber) ||
+              legacyDemoNames.includes(customerLower) ||
+              doc.id.startsWith('test-');
+            if (!isDemo) {
+              fetchedOrders.push({ id: doc.id, ...data });
+            }
           });
 
           // Ring reception alert chime for newly arriving table orders
@@ -117,9 +140,9 @@ export function RestaurantProvider({ children }) {
               if (remoteMap.has(localOrder.id)) return false;
               if (localOrder.createdAt) {
                 const ageSeconds = (Date.now() - new Date(localOrder.createdAt).getTime()) / 1000;
-                return ageSeconds < 60; // Keep local order if created within last 60s
+                return ageSeconds < 600; // Keep local order if created within last 10 minutes
               }
-              return false;
+              return true;
             });
 
             return [...pendingLocalOrders, ...fetchedOrders];
@@ -168,17 +191,32 @@ export function RestaurantProvider({ children }) {
 
   // Derive Table occupancy dynamically based on active orders
   const tablesWithLiveStatus = useMemo(() => {
-    const activeTableIds = new Set(
-      orders
-        .filter(o => !o.isBilled)
-        .map(o => o.tableId)
-    );
+    return tables.map(t => {
+      // Find all orders placed at this table (matching tableId, tableName, or tableNumber)
+      const tableOrders = orders.filter(o => 
+        o.tableId === t.id || 
+        (o.tableName && t.name && o.tableName.toLowerCase() === t.name.toLowerCase()) ||
+        (t.tableNumber && o.tableName && o.tableName.toLowerCase() === `table ${t.tableNumber}`.toLowerCase())
+      );
 
-    return tables.map(t => ({
-      ...t,
-      status: activeTableIds.has(t.id) ? 'occupied' : 'available',
-      hasActiveOrder: activeTableIds.has(t.id)
-    }));
+      // Active orders are any orders not yet paid/settled
+      const activeOrders = tableOrders.filter(o => 
+        !(o.isPaid || o.paymentStatus === 'paid' || o.status === 'paid')
+      );
+
+      const isOccupied = activeOrders.length > 0;
+      const pendingTotal = activeOrders.reduce((sum, o) => sum + (o.total || 0), 0);
+
+      return {
+        ...t,
+        status: isOccupied ? 'occupied' : 'available',
+        hasActiveOrder: isOccupied,
+        activeOrders,
+        activeOrdersCount: activeOrders.length,
+        allTableOrders: tableOrders,
+        pendingTotal
+      };
+    });
   }, [tables, orders]);
 
   // Submit Customer Order: calculates waiting time for the customer and routes order to reception laptop
@@ -323,10 +361,11 @@ export function RestaurantProvider({ children }) {
     // 5. Cloud Firestore synchronization (reliable real-time cloud write)
     if (isFirebaseConfigured && db) {
       try {
+        await ensureGuestAuth();
         const orderDocRef = doc(db, 'restaurants', activeSlug, 'orders', orderId);
         await Promise.race([
           setDoc(orderDocRef, newOrder),
-          new Promise((resolve) => setTimeout(resolve, 1500))
+          new Promise((resolve) => setTimeout(resolve, 2500))
         ]);
       } catch (err) {
         console.warn('Firestore cloud order sync notice:', err);
@@ -341,66 +380,187 @@ export function RestaurantProvider({ children }) {
     };
   }, [menuItems, orders, activeSlug, restaurant, soundEnabled]);
 
-  // Reception laptop marks order as Billed & Sent to Kitchen
-  const markOrderBilled = async (orderId) => {
+  // Reception laptop settles orders (single order or multiple orders for a table/guest)
+  const settleOrders = async (orderIds, paymentMethod = 'UPI') => {
+    if (!orderIds || (Array.isArray(orderIds) && orderIds.length === 0)) return;
+    const ids = Array.isArray(orderIds) ? orderIds : [orderIds];
     const timestamp = new Date().toISOString();
     const updatePayload = {
       isBilled: true,
-      billedAt: timestamp,
+      isPaid: true,
+      paymentStatus: 'paid',
+      status: 'paid',
+      paidAt: timestamp,
+      paymentMethod,
       updatedAt: timestamp
     };
 
     // Optimistically update local state immediately
+    setOrders(prev => prev.map(o => ids.includes(o.id) ? { ...o, ...updatePayload } : o));
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await ensureGuestAuth();
+        for (const id of ids) {
+          const orderRef = doc(db, 'restaurants', activeSlug, 'orders', id);
+          updateDoc(orderRef, updatePayload).catch(err => {
+            console.warn('Firestore settleOrder notice for', id, err);
+          });
+        }
+      } catch (err) {
+        console.warn('Firestore settleOrders error:', err);
+      }
+    }
+  };
+
+  // Reception laptop dispatches order to kitchen (KOT printed, not paid yet)
+  const markOrderBilled = async (orderId) => {
+    if (!orderId) return;
+    const timestamp = new Date().toISOString();
+    const updatePayload = {
+      isBilled: true,
+      status: 'in_kitchen',
+      billedAt: timestamp,
+      updatedAt: timestamp
+    };
+
     setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatePayload } : o));
 
     if (isFirebaseConfigured && db) {
       try {
+        await ensureGuestAuth();
         const orderRef = doc(db, 'restaurants', activeSlug, 'orders', orderId);
-        await Promise.race([
-          updateDoc(orderRef, updatePayload),
-          new Promise((resolve) => setTimeout(resolve, 1500))
-        ]);
+        updateDoc(orderRef, updatePayload).catch(err => {
+          console.warn('Firestore markOrderBilled notice for', orderId, err);
+        });
       } catch (err) {
         console.warn('Firestore markOrderBilled error:', err);
       }
     }
   };
 
+  // Explicit status changer (syncs across Tables, Orders, and Dashboard)
+  const updateOrderStatus = async (orderId, newStatus) => {
+    if (!orderId) return;
+    const timestamp = new Date().toISOString();
+    let updatePayload = { updatedAt: timestamp };
+
+    if (newStatus === 'paid') {
+      updatePayload = {
+        ...updatePayload,
+        isBilled: true,
+        isPaid: true,
+        paymentStatus: 'paid',
+        status: 'paid',
+        paidAt: timestamp
+      };
+    } else if (newStatus === 'in_kitchen' || newStatus === 'billed') {
+      updatePayload = {
+        ...updatePayload,
+        isBilled: true,
+        isPaid: false,
+        paymentStatus: 'unpaid',
+        status: 'in_kitchen',
+        billedAt: timestamp
+      };
+    } else if (newStatus === 'new' || newStatus === 'pending') {
+      updatePayload = {
+        ...updatePayload,
+        isBilled: false,
+        isPaid: false,
+        paymentStatus: 'unpaid',
+        status: 'new',
+        billedAt: null,
+        paidAt: null
+      };
+    }
+
+    setOrders(prev => prev.map(o => o.id === orderId ? { ...o, ...updatePayload } : o));
+
+    if (isFirebaseConfigured && db) {
+      try {
+        await ensureGuestAuth();
+        const orderRef = doc(db, 'restaurants', activeSlug, 'orders', orderId);
+        updateDoc(orderRef, updatePayload).catch(err => {
+          console.warn('Firestore updateOrderStatus notice for', orderId, err);
+        });
+      } catch (err) {
+        console.warn('Firestore updateOrderStatus error:', err);
+      }
+    }
+  };
+
   // Generate / Reprint Bill & Kitchen Order Ticket (KOT)
-  const generateBill = (orderId, customTaxConfig = null) => {
-    const order = orders.find(o => o.id === orderId);
-    if (!order) return null;
+  // Supports single order ID OR array of order IDs for a guest / full table
+  const generateBill = (orderOrOrderIds, customTaxConfig = null) => {
+    if (!orderOrOrderIds) return null;
+    const ids = Array.isArray(orderOrOrderIds) ? orderOrOrderIds : [orderOrOrderIds];
+    const matchingOrders = orders.filter(o => ids.includes(o.id));
+    if (matchingOrders.length === 0) return null;
 
     const billingConfig = customTaxConfig || restaurant.billing || {};
-    const billNumber = `BILL-${order.orderNumber.replace('ORD-', '')}`;
+    const primaryOrder = matchingOrders[0];
+    const billNumber = `BILL-${matchingOrders.map(o => o.orderNumber?.replace('ORD-', '')).join('-')}`;
+
+    // Consolidate dishes across all rounds
+    const aggregatedItems = [];
+    let subtotal = 0;
+    let totalDiscount = 0;
+    let totalTax = 0;
+    let grandTotal = 0;
+
+    matchingOrders.forEach(ord => {
+      subtotal += (ord.subtotal || 0);
+      totalDiscount += (ord.discount || 0);
+      totalTax += (ord.taxDetails?.totalTax || 0);
+      grandTotal += (ord.total || 0);
+
+      ord.items?.forEach(it => {
+        const existing = aggregatedItems.find(x => x.menuItemId === it.menuItemId && x.itemName === it.itemName);
+        if (existing) {
+          existing.quantity += it.quantity;
+          existing.lineTotal += it.lineTotal;
+        } else {
+          aggregatedItems.push({ ...it });
+        }
+      });
+    });
+
+    const uniqueNames = [...new Set(matchingOrders.map(o => o.customerName).filter(Boolean))].join(' & ');
+    const uniquePhones = [...new Set(matchingOrders.map(o => o.customerPhone).filter(Boolean))].join(', ');
 
     return {
       billNumber,
-      orderNumber: order.orderNumber,
-      orderId: order.id,
+      orderNumber: matchingOrders.map(o => o.orderNumber).join(', '),
+      orderIds: ids,
       restaurant: {
         name: restaurant.name,
         address: restaurant.address,
         phone: restaurant.phone,
         gstin: billingConfig.gstin || restaurant.billing?.gstin || '',
+        upiId: billingConfig.upiId || 'naachicafe@okaxis',
+        upiPayeeName: billingConfig.upiPayeeName || restaurant.name,
         logo: restaurant.logo,
         footerMessage: billingConfig.billFooterMessage || "Thank you! Please pay directly at the counter."
       },
       customer: {
-        name: order.customerName,
-        phone: order.customerPhone,
-        table: order.tableName
+        name: uniqueNames || primaryOrder.customerName,
+        phone: uniquePhones || primaryOrder.customerPhone,
+        table: primaryOrder.tableName
       },
-      items: order.items,
-      subtotal: order.subtotal,
-      discount: order.discount || 0,
-      taxDetails: order.taxDetails,
-      serviceCharge: order.serviceCharge || 0,
-      total: order.total,
-      estimatedWaitTime: order.estimatedWaitTime || 10,
-      isBilled: order.isBilled,
-      billedAt: order.billedAt,
-      date: order.createdAt,
+      items: aggregatedItems,
+      subtotal,
+      discount: totalDiscount,
+      taxDetails: primaryOrder.taxDetails ? {
+        ...primaryOrder.taxDetails,
+        totalTax
+      } : { totalTax },
+      serviceCharge: 0,
+      total: grandTotal,
+      estimatedWaitTime: Math.max(...matchingOrders.map(o => o.estimatedWaitTime || 10)),
+      isBilled: matchingOrders.every(o => o.isBilled),
+      billedAt: primaryOrder.billedAt,
+      date: primaryOrder.createdAt,
       generatedAt: new Date().toISOString()
     };
   };
@@ -548,18 +708,33 @@ export function RestaurantProvider({ children }) {
     setRestaurant(merged);
   };
 
+  // Clear all sample / active orders completely
+  const clearAllOrders = () => {
+    setOrders([]);
+    try {
+      for (let i = localStorage.length - 1; i >= 0; i--) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('qr_orders_') || key.includes('session_orders') || key.includes('cart'))) {
+          localStorage.removeItem(key);
+        }
+      }
+    } catch {}
+  };
+
   // Reset demo
   const resetDemoData = () => {
     setRestaurant(DEMO_RESTAURANT);
     setCategories(DEMO_CATEGORIES);
     setMenuItems(DEMO_MENU_ITEMS);
     setTables(DEMO_TABLES);
-    setOrders(DEMO_ORDERS);
+    setOrders([]);
     localStorage.removeItem(`qr_rest_${activeSlug}`);
     localStorage.removeItem(`qr_cats_${activeSlug}`);
     localStorage.removeItem(`qr_menu_${activeSlug}`);
     localStorage.removeItem(`qr_tables_${activeSlug}`);
     localStorage.removeItem(`qr_orders_${activeSlug}`);
+    localStorage.removeItem('qr_restaurant_session_orders');
+    localStorage.removeItem('qr_restaurant_cart');
   };
 
   return (
@@ -584,11 +759,14 @@ export function RestaurantProvider({ children }) {
       orders,
       submitCustomerOrder,
       markOrderBilled,
+      settleOrders,
+      updateOrderStatus,
       generateBill,
       soundEnabled,
       setSoundEnabled,
       testNotificationSound,
-      resetDemoData
+      resetDemoData,
+      clearAllOrders
     }}>
       {children}
     </RestaurantContext.Provider>

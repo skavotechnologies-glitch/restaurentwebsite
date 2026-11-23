@@ -36,14 +36,8 @@ export default function AdminLoginPage() {
     setIsLoading(false);
 
     if (res.success) {
-      navigate('/admin/dashboard');
+      navigate('/admin/orders');
     }
-  };
-
-  const handleDemoFill = () => {
-    setEmail('admin@naachicafe.com');
-    setPassword('admin123');
-    setAuthError(null);
   };
 
   const handleResetPassword = async (e) => {
@@ -65,29 +59,11 @@ export default function AdminLoginPage() {
             <UtensilsCrossed className="w-8 h-8 text-gold-400" />
           </div>
           <h1 className="font-serif font-bold text-2xl sm:text-3xl text-charcoal-900">
-            Staff & Admin Portal
+            Staff &amp; Admin Portal
           </h1>
           <p className="text-xs sm:text-sm text-charcoal-700/80">
-            {restaurant.name} &bull; Reception & Kitchen Management
+            {restaurant.name} &bull; Reception &amp; Kitchen Management
           </p>
-        </div>
-
-        {/* Demo Fast Fill Banner */}
-        <div className="bg-gold-50 border border-gold-400/50 rounded-2xl p-3.5 shadow-sm flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-gold-600 flex-shrink-0" />
-            <div className="text-xs text-charcoal-800">
-              <span className="font-bold">Instant Demo Login:</span>
-              <div className="text-[11px] text-charcoal-700 font-mono">admin@naachicafe.com / admin123</div>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleDemoFill}
-            className="px-3 py-1.5 bg-forest-700 hover:bg-forest-800 text-white text-xs font-semibold rounded-lg shadow transition whitespace-nowrap"
-          >
-            Auto-fill
-          </button>
         </div>
 
         {/* Login Form Card */}
@@ -102,7 +78,7 @@ export default function AdminLoginPage() {
           <form onSubmit={handleLogin} className="space-y-4">
             <div>
               <label className="block text-xs font-bold text-charcoal-700 mb-1">
-                Staff Email Address
+                Admin Email Address
               </label>
               <div className="relative">
                 <Mail className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-charcoal-700/50" />
@@ -111,7 +87,7 @@ export default function AdminLoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  placeholder="admin@naachicafe.com"
+                  placeholder="admin@restaurant.com"
                   className="w-full pl-9 pr-3 py-2.5 text-sm bg-cream-50 border border-cream-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 focus:bg-white transition"
                 />
               </div>

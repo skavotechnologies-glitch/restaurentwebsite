@@ -5,11 +5,14 @@ import {
   Printer, 
   UtensilsCrossed,
   Clock,
-  CheckCircle2
+  CheckCircle2,
+  QrCode
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { formatCurrency, formatDateTime } from '../../utils/formatters';
 import { OrderBillStatusBadge } from '../../components/common/Badge';
+import { generateUpiUri } from '../../utils/upi';
 
 export default function AdminBillingPage() {
   const [searchParams] = useSearchParams();
@@ -99,7 +102,7 @@ export default function AdminBillingPage() {
             {selectedOrder && (
               <div className="flex items-center justify-between text-xs bg-slate-50 p-2.5 rounded-xl border border-slate-200">
                 <span className="font-semibold text-charcoal-800">Status:</span>
-                <OrderBillStatusBadge isBilled={selectedOrder.isBilled} />
+                <OrderBillStatusBadge order={selectedOrder} />
               </div>
             )}
           </div>
@@ -116,6 +119,30 @@ export default function AdminBillingPage() {
               <p className="text-xs text-charcoal-700 leading-relaxed bg-amber-50 p-3 rounded-xl border border-amber-200">
                 Customer will present this bill at the counter and pay directly via Cash, UPI, or Card. Print this receipt, hand one copy to the kitchen for preparation, and one copy to the table.
               </p>
+
+              {/* Dynamic Screen UPI QR Code for Counter Scan */}
+              <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl flex flex-col items-center text-center space-y-2">
+                <span className="text-[11px] font-bold text-charcoal-700 uppercase tracking-wider flex items-center gap-1">
+                  <QrCode className="w-3.5 h-3.5 text-forest-700" />
+                  <span>Counter QR: Pay {formatCurrency(selectedOrder.total, currency)}</span>
+                </span>
+                <div className="p-2 bg-white border border-slate-300 rounded-xl shadow-sm">
+                  <QRCodeSVG 
+                    value={generateUpiUri({
+                      upiId: restaurant.billing?.upiId || 'naachicafe@okaxis',
+                      payeeName: restaurant.billing?.upiPayeeName || restaurant.name,
+                      amount: selectedOrder.total || 0,
+                      transactionNote: `Bill ${selectedOrder.orderNumber} ${selectedOrder.tableName}`,
+                      orderRef: selectedOrder.orderNumber
+                    })}
+                    size={120}
+                    level="M"
+                  />
+                </div>
+                <p className="text-[10px] text-slate-500 font-mono">
+                  GPay &bull; PhonePe &bull; Paytm &bull; BHIM
+                </p>
+              </div>
 
               {billedNotice && (
                 <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-900 font-semibold flex items-center gap-2">

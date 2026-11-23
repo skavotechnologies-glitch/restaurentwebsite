@@ -37,6 +37,8 @@ export const DEMO_RESTAURANT = {
     serviceChargeRate: 0,
     discountRate: 0,
     gstin: "29AAAAA0000A1Z5",
+    upiId: "naachicafe@okaxis",
+    upiPayeeName: "Naachi Café",
     billFooterMessage: "Thank you for dining with Naachi Café! Please pay directly at the counter.",
   }
 };
@@ -315,102 +317,4 @@ export const DEMO_TABLES = [
   { id: "T06", restaurantId: "naachi-cafe", tableNumber: "6", name: "Table 6", capacity: 8, isActive: true, status: "available" },
 ];
 
-export const DEMO_ORDERS = [
-  {
-    id: "ORD-1048",
-    orderNumber: "ORD-1048",
-    restaurantId: "naachi-cafe",
-    tableId: "T04",
-    tableName: "Table 4",
-    customerName: "Rohan Sharma",
-    customerPhone: "9876543210",
-    estimatedWaitTime: 15, // in minutes
-    isBilled: false, // reception laptop generates bill and gives to kitchen
-    items: [
-      {
-        menuItemId: "item-chicken-biriyani",
-        itemName: "Chicken Biriyani",
-        priceAtOrder: 180,
-        prepTime: 15,
-        quantity: 2,
-        lineTotal: 360,
-        foodType: "non-veg",
-        specialInstructions: "Extra raita please"
-      },
-      {
-        menuItemId: "item-lemon-juice",
-        itemName: "Lemon Juice",
-        priceAtOrder: 25,
-        prepTime: 7,
-        quantity: 2,
-        lineTotal: 50,
-        foodType: "veg",
-        specialInstructions: "Less ice"
-      }
-    ],
-    itemCount: 4,
-    subtotal: 410,
-    taxDetails: {
-      cGstRate: 2.5,
-      cGstAmount: 10.25,
-      sGstRate: 2.5,
-      sGstAmount: 10.25,
-      totalTax: 20.50
-    },
-    serviceCharge: 0,
-    discount: 0,
-    total: 430.50,
-    specialInstructions: "Please serve juices first",
-    createdAt: new Date(Date.now() - 5 * 60 * 1000).toISOString(),
-    readyAt: new Date(Date.now() + 10 * 60 * 1000).toISOString()
-  },
-  {
-    id: "ORD-1047",
-    orderNumber: "ORD-1047",
-    restaurantId: "naachi-cafe",
-    tableId: "T02",
-    tableName: "Table 2",
-    customerName: "Priya Sundaram",
-    customerPhone: "9123456780",
-    estimatedWaitTime: 10,
-    isBilled: true,
-    billedAt: new Date(Date.now() - 15 * 60 * 1000).toISOString(),
-    items: [
-      {
-        menuItemId: "item-coffee",
-        itemName: "Coffee",
-        priceAtOrder: 20,
-        prepTime: 5,
-        quantity: 2,
-        lineTotal: 40,
-        foodType: "veg",
-        specialInstructions: "Strong filter brew"
-      },
-      {
-        menuItemId: "item-samosa",
-        itemName: "Samosa",
-        priceAtOrder: 15,
-        prepTime: 10,
-        quantity: 2,
-        lineTotal: 30,
-        foodType: "veg",
-        specialInstructions: ""
-      }
-    ],
-    itemCount: 4,
-    subtotal: 70,
-    taxDetails: {
-      cGstRate: 2.5,
-      cGstAmount: 1.75,
-      sGstRate: 2.5,
-      sGstAmount: 1.75,
-      totalTax: 3.50
-    },
-    serviceCharge: 0,
-    discount: 0,
-    total: 73.50,
-    specialInstructions: "",
-    createdAt: new Date(Date.now() - 20 * 60 * 1000).toISOString(),
-    readyAt: new Date(Date.now() - 10 * 60 * 1000).toISOString()
-  }
-];
+export const DEMO_ORDERS = [];

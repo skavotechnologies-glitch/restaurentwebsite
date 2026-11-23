@@ -119,20 +119,16 @@ export default function CustomerMenuPage() {
   const isOrderingDisabled = !restaurant.isOpen || restaurant.onlineOrderingEnabled === false;
   const currency = restaurant.billing?.currency || '₹';
 
-  // Active table orders for this dining session
+  // Active orders placed by THIS customer for this dining session (only their own orders, not full table)
   const activeTableOrders = useMemo(() => {
-    if (!tableInfo?.id && (!sessionOrderIds || sessionOrderIds.length === 0)) return [];
+    if (!sessionOrderIds || sessionOrderIds.length === 0) return [];
     return orders.filter(o => {
-      if (sessionOrderIds?.includes(o.id) || sessionOrderIds?.includes(o.orderNumber)) return true;
-      if (tableInfo?.id && (o.tableId === tableInfo.id || o.tableName?.toLowerCase() === tableInfo.name?.toLowerCase())) {
-        if (o.createdAt) {
-          const diffHours = (Date.now() - new Date(o.createdAt).getTime()) / (1000 * 60 * 60);
-          if (diffHours < 6) return true;
-        }
-      }
-      return false;
+      // Once customer has paid for their session, do NOT show the unpaid running bill banner
+      if (o.isPaid || o.paymentStatus === 'paid' || o.status === 'paid') return false;
+      // Only show orders placed by this customer in their session
+      return sessionOrderIds.includes(o.id) || sessionOrderIds.includes(o.orderNumber);
     }).sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
-  }, [orders, tableInfo, sessionOrderIds]);
+  }, [orders, sessionOrderIds]);
 
   const activeTableGrandTotal = useMemo(() => {
     return activeTableOrders.reduce((sum, o) => sum + (o.total || 0), 0);
@@ -156,19 +152,16 @@ export default function CustomerMenuPage() {
               </div>
               <div className="text-left">
                 <div className="text-[11px] text-forest-200 font-semibold uppercase tracking-wider">
-                  {tableInfo?.name || 'Your Table'} &bull; {activeTableOrders.length} {activeTableOrders.length === 1 ? 'Order Placed' : 'Orders Placed'}
+                  {tableInfo?.name || 'Your Table'} &bull; {activeTableOrders.length === 1 ? 'Your Order' : `${activeTableOrders.length} Orders Placed`}
                 </div>
                 <div className="text-sm font-serif font-bold text-white flex items-center gap-1.5">
-                  <span>Running Bill: {formatCurrency(activeTableGrandTotal, currency)}</span>
-                  <span className="text-[10px] font-sans text-gold-400 bg-forest-700/80 px-2 py-0.5 rounded-full border border-forest-500">
-                    Consolidated
-                  </span>
+                  <span>Your Bill: {formatCurrency(activeTableGrandTotal, currency)}</span>
                 </div>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 text-xs font-bold text-gold-400 group-hover:translate-x-0.5 transition">
-              <span>View Full Bill</span>
+              <span>View Order</span>
               <ArrowRight className="w-4 h-4" />
             </div>
           </Link>

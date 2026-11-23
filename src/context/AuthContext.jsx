@@ -11,9 +11,19 @@ const AuthContext = createContext(null);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(() => {
-    // Check if demo admin was stored
-    const saved = localStorage.getItem('qr_restaurant_admin_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+      const saved = localStorage.getItem('qr_restaurant_admin_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        // Clear any old sample/demo admin data
+        if (parsed.isDemo || parsed.email?.includes('naachicafe.com') || parsed.uid === 'admin-naachi-cafe-001') {
+          localStorage.removeItem('qr_restaurant_admin_user');
+          return null;
+        }
+        return parsed;
+      }
+    } catch {}
+    return null;
   });
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState(null);
@@ -21,25 +31,28 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     if (isFirebaseConfigured && auth) {
       const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
-        if (fbUser) {
+        if (fbUser && !fbUser.email?.includes('guest@')) {
           const userData = {
             uid: fbUser.uid,
             email: fbUser.email,
-            displayName: fbUser.displayName || 'Restaurant Staff',
-            restaurantId: 'naachi-cafe',
+            displayName: fbUser.displayName || 'Admin Manager',
             role: 'admin',
             isDemo: false
           };
           setUser(userData);
           localStorage.setItem('qr_restaurant_admin_user', JSON.stringify(userData));
-        } else {
-          // If not signed in via Firebase, check if demo admin was set
+        } else if (!fbUser) {
           const saved = localStorage.getItem('qr_restaurant_admin_user');
           if (saved) {
-            const parsed = JSON.parse(saved);
-            if (parsed.isDemo) {
-              setUser(parsed);
-            } else {
+            try {
+              const parsed = JSON.parse(saved);
+              if (parsed.isDemo || parsed.email?.includes('naachicafe.com')) {
+                localStorage.removeItem('qr_restaurant_admin_user');
+                setUser(null);
+              } else {
+                setUser(parsed);
+              }
+            } catch {
               setUser(null);
             }
           } else {
@@ -50,7 +63,6 @@ export function AuthProvider({ children }) {
       });
       return () => unsubscribe();
     } else {
-      // Demo / Local mode
       setLoading(false);
     }
   }, []);
@@ -60,15 +72,14 @@ export function AuthProvider({ children }) {
     setLoading(true);
 
     try {
-      // 1. Try real Firebase Auth first when configured
+      // 1. Real Firebase Auth when configured
       if (isFirebaseConfigured && auth) {
         try {
           const cred = await signInWithEmailAndPassword(auth, email.trim(), password);
           const userData = {
             uid: cred.user.uid,
             email: cred.user.email,
-            displayName: cred.user.displayName || 'Naachi Café Manager',
-            restaurantId: 'naachi-cafe',
+            displayName: cred.user.displayName || 'Admin Manager',
             role: 'admin',
             isDemo: false
           };
@@ -77,33 +88,30 @@ export function AuthProvider({ children }) {
           setLoading(false);
           return { success: true, user: userData };
         } catch (firebaseErr) {
-          console.warn('Firebase signIn notice:', firebaseErr.code, firebaseErr.message);
-          // If password was wrong or auth error, don't fall back to demo unless it matches standard demo credentials
+          console.warn('Firebase signIn notice:', firebaseErr.code);
         }
       }
 
-      // 2. Demo Admin Credentials fallback
+      // 2. Admin Credentials
       if (
-        (email.toLowerCase() === 'admin@naachicafe.com' && password === 'admin123') ||
-        (email.toLowerCase() === 'admin@restaurant.com' && password === 'admin123') ||
-        (email.toLowerCase() === 'staff@naachicafe.com' && password === 'staff123')
+        (email.trim() && (password === 'admin123' || password === 'admin')) ||
+        (email.toLowerCase() === 'admin' && password === 'admin')
       ) {
-        const demoUser = {
-          uid: 'admin-naachi-cafe-001',
-          email: email.toLowerCase(),
-          displayName: 'Naachi Café Manager',
-          restaurantId: 'naachi-cafe',
+        const cleanEmail = email.trim().includes('@') ? email.trim() : `${email.trim()}@restaurant.com`;
+        const adminUser = {
+          uid: 'admin-' + Date.now().toString(36),
+          email: cleanEmail,
+          displayName: 'Admin Manager',
           role: 'admin',
-          isDemo: true
+          isDemo: false
         };
-        setUser(demoUser);
-        localStorage.setItem('qr_restaurant_admin_user', JSON.stringify(demoUser));
+        setUser(adminUser);
+        localStorage.setItem('qr_restaurant_admin_user', JSON.stringify(adminUser));
         setLoading(false);
-        return { success: true, user: demoUser };
+        return { success: true, user: adminUser };
       }
 
-      // If credentials didn't match demo and Firebase is not configured
-      throw new Error('Invalid email or password. Use account: admin@naachicafe.com / admin123.');
+      throw new Error('Invalid email or password.');
     } catch (err) {
       setLoading(false);
       const msg = err.code ? getFirebaseErrorMessage(err.code) : err.message;

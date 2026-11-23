@@ -40,20 +40,15 @@ export default function CustomerCartPage() {
   const totals = calculateTotals(billingConfig);
   const currency = billingConfig.currency || '₹';
 
-  // Active table orders for this dining session
+  // Active orders placed by THIS customer for this dining session (only their own orders, not full table)
   const activeTableOrders = useMemo(() => {
-    if (!tableInfo?.id && (!sessionOrderIds || sessionOrderIds.length === 0)) return [];
+    if (!sessionOrderIds || sessionOrderIds.length === 0) return [];
     return orders.filter(o => {
-      if (sessionOrderIds?.includes(o.id) || sessionOrderIds?.includes(o.orderNumber)) return true;
-      if (tableInfo?.id && (o.tableId === tableInfo.id || o.tableName?.toLowerCase() === tableInfo.name?.toLowerCase())) {
-        if (o.createdAt) {
-          const diffHours = (Date.now() - new Date(o.createdAt).getTime()) / (1000 * 60 * 60);
-          if (diffHours < 6) return true;
-        }
-      }
-      return false;
+      // Once customer has paid for their session, do NOT show the unpaid running bill banner
+      if (o.isBilled || o.isPaid || o.paymentStatus === 'paid' || o.status === 'paid') return false;
+      return sessionOrderIds.includes(o.id) || sessionOrderIds.includes(o.orderNumber);
     }).sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
-  }, [orders, tableInfo, sessionOrderIds]);
+  }, [orders, sessionOrderIds]);
 
   const activeTableGrandTotal = useMemo(() => {
     return activeTableOrders.reduce((sum, o) => sum + (o.total || 0), 0);
@@ -89,17 +84,17 @@ export default function CustomerCartPage() {
           {activeTableOrders.length > 0 && (
             <div className="mt-6 p-4 bg-forest-50 border border-forest-200 rounded-2xl text-center space-y-2 max-w-xs mx-auto shadow-sm">
               <span className="text-xs text-forest-800 font-bold block">
-                🍽️ You have {activeTableOrders.length} {activeTableOrders.length === 1 ? 'order placed' : 'orders placed'} for {tableInfo?.name || 'your table'}!
+                🍽️ You have active order #{activeTableOrders[activeTableOrders.length - 1].orderNumber} for {tableInfo?.name || 'your table'}!
               </span>
               <div className="font-serif font-bold text-lg text-forest-900">
-                Running Bill: {formatCurrency(activeTableGrandTotal, currency)}
+                Order Total: {formatCurrency(activeTableOrders[activeTableOrders.length - 1].total, currency)}
               </div>
               <Link
                 to={`/order/${activeTableOrders[activeTableOrders.length - 1].id}`}
                 className="w-full py-2.5 px-3 bg-forest-700 hover:bg-forest-800 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-sm transition"
               >
                 <Receipt className="w-3.5 h-3.5" />
-                <span>Show Full Consolidated Bill</span>
+                <span>Track Active Order</span>
               </Link>
             </div>
           )}
@@ -139,7 +134,7 @@ export default function CustomerCartPage() {
       </header>
 
       <main className="max-w-xl mx-auto px-4 py-4 space-y-4">
-        {/* Additional Order Round Notice */}
+        {/* New Order Notice */}
         {activeTableOrders.length > 0 && (
           <div className="bg-amber-50 border border-amber-300 rounded-2xl p-3.5 text-xs text-amber-900 flex items-start gap-3 shadow-sm">
             <div className="w-8 h-8 rounded-xl bg-amber-100 border border-amber-300 flex items-center justify-center flex-shrink-0 text-amber-800">
@@ -147,10 +142,10 @@ export default function CustomerCartPage() {
             </div>
             <div className="flex-1">
               <span className="font-bold block text-amber-950">
-                Round {activeTableOrders.length + 1}: Adding Extra Dishes to {tableInfo?.name || 'Table'}
+                Ordering Additional Dishes for {tableInfo?.name || 'Table'}
               </span>
               <p className="text-[11px] text-amber-800 mt-0.5">
-                These new dishes will be sent to the kitchen as a separate cooking ticket, and automatically merged into your table's consolidated bill ({formatCurrency(activeTableGrandTotal, currency)} + new items).
+                These dishes will be sent to the kitchen as a separate order ticket.
               </p>
             </div>
           </div>

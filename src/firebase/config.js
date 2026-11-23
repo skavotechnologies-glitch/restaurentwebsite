@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
-import { getAuth } from 'firebase/auth';
+import { getAuth, signInWithEmailAndPassword } from 'firebase/auth';
 import { getFirestore } from 'firebase/firestore';
 import { getStorage } from 'firebase/storage';
 
@@ -41,5 +41,18 @@ if (isFirebaseConfigured) {
 } else {
   console.info("Firebase environment variables not detected or incomplete. Running in Local/Demo Hybrid mode with full client capabilities.");
 }
+
+// Ensures that unauthenticated customer devices (e.g. mobile scanning table QR) have valid Firestore write access
+export const ensureGuestAuth = async () => {
+  if (!isFirebaseConfigured || !auth) return null;
+  if (auth.currentUser) return auth.currentUser;
+  try {
+    const cred = await signInWithEmailAndPassword(auth, 'guest@naachicafe.com', 'guestPass123!');
+    return cred.user;
+  } catch (err) {
+    console.warn('Guest silent auth notice:', err?.code, err?.message);
+    return null;
+  }
+};
 
 export { app, auth, db, storage };

@@ -4,8 +4,10 @@ const CartContext = createContext(null);
 
 export function CartProvider({ children }) {
   const [cartItems, setCartItems] = useState(() => {
-    const saved = localStorage.getItem('qr_restaurant_cart');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      localStorage.removeItem('qr_restaurant_cart');
+    } catch {}
+    return [];
   });
 
   const [tableInfo, setTableInfo] = useState(() => {
@@ -14,28 +16,35 @@ export function CartProvider({ children }) {
   });
 
   const [customerInfo, setCustomerInfo] = useState(() => {
-    const saved = localStorage.getItem('qr_restaurant_customer');
-    return saved ? JSON.parse(saved) : { name: '', phone: '', instructions: '' };
+    return { name: '', phone: '', instructions: '' };
   });
 
   // Track all order IDs placed in this customer's dining session
   const [sessionOrderIds, setSessionOrderIds] = useState(() => {
-    const saved = localStorage.getItem('qr_restaurant_session_orders');
-    return saved ? JSON.parse(saved) : [];
+    try {
+      const saved = localStorage.getItem('qr_restaurant_session_orders');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
   });
 
   const addSessionOrder = (orderId) => {
     if (!orderId) return;
     setSessionOrderIds(prev => {
       const updated = prev.includes(orderId) ? prev : [...prev, orderId];
-      localStorage.setItem('qr_restaurant_session_orders', JSON.stringify(updated));
+      try {
+        localStorage.setItem('qr_restaurant_session_orders', JSON.stringify(updated));
+      } catch {}
       return updated;
     });
   };
 
   const clearSessionOrders = () => {
     setSessionOrderIds([]);
-    localStorage.removeItem('qr_restaurant_session_orders');
+    try {
+      localStorage.removeItem('qr_restaurant_session_orders');
+    } catch {}
   };
 
   useEffect(() => {
