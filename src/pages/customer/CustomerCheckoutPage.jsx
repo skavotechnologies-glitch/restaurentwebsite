@@ -27,7 +27,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useCart } from '../../context/CartContext';
 import { formatCurrency } from '../../utils/formatters';
-import { generateUpiUri } from '../../utils/upi';
+import { generateUpiUri, generateCleanIntentUri } from '../../utils/upi';
 
 export default function CustomerCheckoutPage() {
   const { restaurantSlug = 'naachi-cafe' } = useParams();
@@ -88,6 +88,14 @@ export default function CustomerCheckoutPage() {
     transactionNote: `Table ${effectiveTable.name} Bill`,
     orderRef: `ORD-${Date.now().toString(36).toUpperCase()}`,
     callbackUrl: window.location.href,
+    aid: billingConfig.upiAid || 'uGICAgMD27bClFw'
+  });
+
+  // Clean verified Google Pay intent (identical to physical stand QR, without &am=)
+  // This bypasses the Google Pay "Bank limit exceeded" error on personal accounts!
+  const cleanIntentUri = generateCleanIntentUri({
+    upiId,
+    payeeName: upiPayeeName,
     aid: billingConfig.upiAid || 'uGICAgMD27bClFw'
   });
 
@@ -185,7 +193,7 @@ export default function CustomerCheckoutPage() {
     }
   };
 
-  // Launch GPay / UPI app
+  // Launch GPay / UPI app using clean verified intent
   const handleStartUpiPayment = (e) => {
     if (e) e.preventDefault();
     setFormError('');
@@ -196,11 +204,16 @@ export default function CustomerCheckoutPage() {
       return;
     }
 
+    // Automatically copy bill amount so user can paste or type it in Google Pay
+    try {
+      navigator.clipboard.writeText(totals.grandTotal.toFixed(2));
+    } catch (err) {}
+
     setPaymentInitiated(true);
     setShowVerificationModal(true);
 
-    // Launch GPay / native UPI intent
-    window.location.href = upiUri;
+    // Launch verified clean intent (without &am=) to bypass the "Bank limit exceeded" error!
+    window.location.href = cleanIntentUri;
   };
 
   // Verify 12-digit UTR from GPay receipt and auto-submit order
@@ -742,11 +755,35 @@ export default function CustomerCheckoutPage() {
                   <ShieldCheck className="w-6 h-6" />
                 </div>
                 <h3 className="font-serif font-bold text-lg text-charcoal-900">
-                  Payment Completed in GPay?
+                  Payment in Google Pay
                 </h3>
                 <p className="text-xs text-charcoal-600">
                   Enter the 12-digit UPI Reference No. / UTR from your payment receipt to confirm your order for <strong>{effectiveTable.name}</strong>.
                 </p>
+              </div>
+
+              {/* Amount & Payee Summary Card */}
+              <div className="bg-purple-50/70 p-3 rounded-2xl border border-purple-200 text-left space-y-1 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-charcoal-600">Payee:</span>
+                  <span className="font-bold text-purple-950">{upiPayeeName}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-charcoal-600">Amount to Enter:</span>
+                  <span className="font-serif font-bold text-forest-800 text-sm">
+                    {formatCurrency(totals.grandTotal, currency)}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center pt-1 border-t border-purple-200/60 text-[11px]">
+                  <span className="text-charcoal-500">Google Pay didn't open?</span>
+                  <a
+                    href={cleanIntentUri}
+                    className="font-bold text-purple-700 hover:text-purple-900 underline inline-flex items-center gap-0.5"
+                  >
+                    <span>Tap to Open GPay</span>
+                    <ExternalLink className="w-3 h-3" />
+                  </a>
+                </div>
               </div>
 
               <div className="space-y-2 text-left">

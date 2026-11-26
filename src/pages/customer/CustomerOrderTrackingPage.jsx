@@ -20,7 +20,7 @@ import { QRCodeSVG } from 'qrcode.react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useCart } from '../../context/CartContext';
 import { formatCurrency, formatTime } from '../../utils/formatters';
-import { generateUpiUri } from '../../utils/upi';
+import { generateUpiUri, generateCleanIntentUri } from '../../utils/upi';
 
 export default function CustomerOrderTrackingPage() {
   const { orderId } = useParams();
@@ -106,6 +106,12 @@ export default function CustomerOrderTrackingPage() {
     amount: mergedTotal,
     transactionNote: `Table ${displayTable} Bill`,
     orderRef: activeRounds[0]?.orderNumber || 'ORD-BILL',
+    aid: restaurant.billing?.upiAid || 'uGICAgMD27bClFw'
+  });
+
+  const cleanIntentUri = generateCleanIntentUri({
+    upiId,
+    payeeName: upiPayeeName,
     aid: restaurant.billing?.upiAid || 'uGICAgMD27bClFw'
   });
   const [showUpiQr, setShowUpiQr] = useState(false);
@@ -278,11 +284,11 @@ export default function CustomerOrderTrackingPage() {
                 <span>{showUpiQr ? 'Hide UPI QR' : 'Show UPI QR'}</span>
               </button>
               <a
-                href={upiUri}
+                href={cleanIntentUri}
                 className="px-3 py-1.5 bg-gold-400 hover:bg-gold-500 rounded-xl text-xs font-bold text-charcoal-900 transition flex items-center gap-1.5"
               >
                 <Smartphone className="w-3.5 h-3.5" />
-                <span>Open UPI App</span>
+                <span>Open GPay</span>
               </a>
             </div>
             {showUpiQr && (
