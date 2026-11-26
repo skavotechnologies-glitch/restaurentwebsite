@@ -117,7 +117,7 @@ export default function CustomerOrderSuccessPage() {
                 {formatCurrency(order.total, currency)}
               </div>
               <p className="text-[11px] text-purple-100/90 max-w-xs mx-auto">
-                Payment sent to <strong>{order.upiDetails?.payeeName || 'Restaurant Owner'}</strong> ({order.upiDetails?.upiId || restaurant.billing?.upiId || 'naachicafe@okaxis'}).
+                Payment sent to <strong>{order.upiDetails?.payeeName || 'Restaurant Owner'}</strong> ({order.upiDetails?.upiId || restaurant.billing?.upiId || 'palanikathirvel05@okaxis'}).
               </p>
               {order.upiRef && (
                 <div className="inline-flex items-center gap-1 text-[11px] font-mono bg-purple-950/60 text-purple-200 px-2.5 py-1 rounded-lg border border-purple-700/50">

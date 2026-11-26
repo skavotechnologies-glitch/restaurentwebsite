@@ -64,7 +64,7 @@ export default function CustomerCheckoutPage() {
   const totals = calculateTotals(billingConfig);
   const currency = billingConfig.currency || '₹';
 
-  const upiId = billingConfig.upiId || 'naachicafe@okaxis';
+  const upiId = billingConfig.upiId || 'palanikathirvel05@okaxis';
   const upiPayeeName = billingConfig.upiPayeeName || restaurant.name || 'Restaurant Owner';
   const effectiveTable = tableInfo || (tables && tables.length > 0 ? tables[0] : { id: 'T01', name: 'Table 1' });
 

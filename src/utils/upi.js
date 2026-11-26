@@ -4,14 +4,14 @@
  */
 
 export function generateUpiUri({
-  upiId = 'naachicafe@okaxis',
+  upiId = 'palanikathirvel05@okaxis',
   payeeName = 'Naachi Café',
   amount = 0,
   transactionNote = 'Restaurant Bill',
   orderRef = '',
   callbackUrl = ''
 }) {
-  const cleanUpi = encodeURIComponent(upiId ? upiId.trim() : 'naachicafe@okaxis');
+  const cleanUpi = encodeURIComponent(upiId ? upiId.trim() : 'palanikathirvel05@okaxis');
   const cleanName = encodeURIComponent(payeeName ? payeeName.trim() : 'Restaurant');
   const cleanAmount = Number(amount || 0).toFixed(2);
   const cleanNote = encodeURIComponent(transactionNote ? transactionNote.trim() : 'Dining Bill');

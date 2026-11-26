@@ -129,7 +129,7 @@ export default function AdminBillingPage() {
                 <div className="p-2 bg-white border border-slate-300 rounded-xl shadow-sm">
                   <QRCodeSVG 
                     value={generateUpiUri({
-                      upiId: restaurant.billing?.upiId || 'naachicafe@okaxis',
+                      upiId: restaurant.billing?.upiId || 'palanikathirvel05@okaxis',
                       payeeName: restaurant.billing?.upiPayeeName || restaurant.name,
                       amount: selectedOrder.total || 0,
                       transactionNote: `Bill ${selectedOrder.orderNumber} ${selectedOrder.tableName}`,

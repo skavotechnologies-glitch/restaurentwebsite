@@ -60,16 +60,16 @@ export default function CustomerOrderTrackingPage() {
     return matched.sort((a, b) => new Date(a.createdAt || 0) - new Date(b.createdAt || 0));
   }, [orders, sessionOrderIds, directOrder]);
 
-  // Active (unpaid) rounds for this customer
+  // Active dining rounds for this customer (session not yet settled/closed by admin)
   const activeRounds = useMemo(() => {
     return customerSessionOrders.filter(o => 
-      !(o.isPaid || o.paymentStatus === 'paid' || o.status === 'paid')
+      !o.isSettled && o.status !== 'settled' && o.status !== 'archived'
     );
   }, [customerSessionOrders]);
 
-  // Check if all customer orders in this session have been marked as PAID
+  // Check if all customer orders in this session have been settled/cleared by admin
   const isPaid = activeRounds.length === 0 && customerSessionOrders.length > 0 && 
-    customerSessionOrders.every(o => o.isPaid || o.paymentStatus === 'paid' || o.status === 'paid');
+    customerSessionOrders.every(o => o.isSettled || o.status === 'settled' || o.status === 'archived');
 
   // Merged totals across all active rounds
   const mergedTotal = useMemo(() => {
@@ -95,7 +95,7 @@ export default function CustomerOrderTrackingPage() {
   const primaryOrder = activeRounds[0] || customerSessionOrders[0] || directOrder;
   const isUpiOrder = activeRounds.some(o => o.paymentMethod === 'upi') || primaryOrder?.paymentMethod === 'upi';
   const upiRef = activeRounds.find(o => o.upiRef)?.upiRef || primaryOrder?.upiRef;
-  const upiId = restaurant.billing?.upiId || 'naachicafe@okaxis';
+  const upiId = restaurant.billing?.upiId || 'palanikathirvel05@okaxis';
   const upiPayeeName = restaurant.billing?.upiPayeeName || restaurant.name || 'Restaurant Owner';
 
   const upiUri = generateUpiUri({

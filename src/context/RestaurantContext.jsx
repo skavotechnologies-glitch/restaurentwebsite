@@ -27,7 +27,16 @@ export function RestaurantProvider({ children }) {
   // Restaurant details & settings
   const [restaurant, setRestaurant] = useState(() => {
     const saved = localStorage.getItem(`qr_rest_${activeSlug}`);
-    return saved ? JSON.parse(saved) : DEMO_RESTAURANT;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (!parsed.billing?.upiId || parsed.billing?.upiId === 'naachicafe@okaxis') {
+          parsed.billing = { ...parsed.billing, upiId: 'palanikathirvel05@okaxis' };
+        }
+        return parsed;
+      } catch (e) {}
+    }
+    return DEMO_RESTAURANT;
   });
 
   // Categories
@@ -196,9 +205,9 @@ export function RestaurantProvider({ children }) {
         (t.tableNumber && o.tableName && o.tableName.toLowerCase() === `table ${t.tableNumber}`.toLowerCase())
       );
 
-      // Active orders are any orders not yet paid/settled
+      // Active orders are any orders not yet settled
       const activeOrders = tableOrders.filter(o => 
-        !(o.isPaid || o.paymentStatus === 'paid' || o.status === 'paid')
+        !o.isSettled && o.status !== 'settled' && o.status !== 'archived'
       );
 
       const isOccupied = activeOrders.length > 0;
@@ -342,17 +351,21 @@ export function RestaurantProvider({ children }) {
       isBilled: false,
       billedAt: null,
 
-      // Payment details (Option B: Cash on Delivery or Direct Owner UPI)
+      // Active dining table session indicator
+      isSettled: false,
+      settledAt: null,
+
+      // Payment details (Cash on Delivery or Direct Owner UPI)
       paymentMethod: paymentMethod || 'cash',
-      paymentStatus: paymentStatus || (paymentMethod === 'upi' ? 'pending_verification' : 'unpaid'),
+      paymentStatus: paymentStatus || (paymentMethod === 'upi' ? 'paid_online' : 'unpaid'),
       upiRef: upiRef ? upiRef.trim() : '',
       upiDetails: upiDetails || (paymentMethod === 'upi' ? {
-        upiId: billingConfig.upiId || 'naachicafe@okaxis',
+        upiId: billingConfig.upiId || 'palanikathirvel05@okaxis',
         payeeName: billingConfig.upiPayeeName || restaurant.name || 'Restaurant Owner',
         amount: grandTotal,
         upiRef: upiRef ? upiRef.trim() : ''
       } : null),
-      autoPrintRequested: paymentMethod === 'cash',
+      autoPrintRequested: true,
       
       specialInstructions: specialInstructions.trim(),
       createdAt: now.toISOString(),
@@ -403,6 +416,8 @@ export function RestaurantProvider({ children }) {
       isPaid: true,
       paymentStatus: 'paid',
       status: 'paid',
+      isSettled: true,
+      settledAt: timestamp,
       paidAt: timestamp,
       paymentMethod,
       updatedAt: timestamp
@@ -551,7 +566,7 @@ export function RestaurantProvider({ children }) {
         address: restaurant.address,
         phone: restaurant.phone,
         gstin: billingConfig.gstin || restaurant.billing?.gstin || '',
-        upiId: billingConfig.upiId || 'naachicafe@okaxis',
+        upiId: billingConfig.upiId || 'palanikathirvel05@okaxis',
         upiPayeeName: billingConfig.upiPayeeName || restaurant.name,
         logo: restaurant.logo,
         footerMessage: billingConfig.billFooterMessage || "Thank you! Please pay directly at the counter."

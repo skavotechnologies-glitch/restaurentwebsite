@@ -37,7 +37,7 @@ export const DEMO_RESTAURANT = {
     serviceChargeRate: 0,
     discountRate: 0,
     gstin: "29AAAAA0000A1Z5",
-    upiId: "naachicafe@okaxis",
+    upiId: "palanikathirvel05@okaxis",
     upiPayeeName: "Naachi Café",
     billFooterMessage: "Thank you for dining with Naachi Café! Please pay directly at the counter.",
   }

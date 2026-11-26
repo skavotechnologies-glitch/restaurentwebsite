@@ -80,73 +80,71 @@ export default function AdminOrdersPage() {
       const order = e.detail?.order;
       if (!order || !autoPrintEnabled) return;
 
-      // Auto-print Cash on Delivery orders (or if auto-print is explicitly requested)
-      if (order.paymentMethod === 'cash' || order.autoPrintRequested) {
-        if (autoPrintedOrderIdsRef.current.has(order.id)) return;
-        autoPrintedOrderIdsRef.current.add(order.id);
+      // Auto-print all placed orders (Cash on Delivery OR Online UPI) directly to billing machine!
+      if (autoPrintedOrderIdsRef.current.has(order.id)) return;
+      autoPrintedOrderIdsRef.current.add(order.id);
 
-        markOrderBilled(order.id);
-        const bill = generateBill(order.id);
-        setPrintData({
-          type: 'kot',
-          roundNumber: 1,
-          order,
-          tableName: order.tableName,
-          customerName: order.customerName,
-          bill
-        });
+      markOrderBilled(order.id);
+      const bill = generateBill(order.id);
+      setPrintData({
+        type: 'kot',
+        roundNumber: order.roundNumber || 1,
+        order,
+        tableName: order.tableName,
+        customerName: order.customerName,
+        bill
+      });
 
-        setSettledToast({
-          title: `🖨️ Auto-Printed Bill & KOT`,
-          message: `${order.tableName} • ${order.customerName} • Cash on Delivery`
-        });
+      const modeText = order.paymentMethod === 'upi' ? 'Paid via UPI' : 'Cash on Delivery';
+      setSettledToast({
+        title: `🖨️ KOT Sent to Billing Machine`,
+        message: `${order.tableName} • ${order.customerName} • ${modeText} • Tear & Give to Kitchen`
+      });
 
-        setTimeout(() => {
-          window.print();
-        }, 300);
-      }
+      setTimeout(() => {
+        window.print();
+      }, 250);
     };
 
     window.addEventListener('qr_new_order_placed', handleOrderArrival);
     return () => window.removeEventListener('qr_new_order_placed', handleOrderArrival);
   }, [autoPrintEnabled, markOrderBilled, generateBill]);
 
-  // Also auto-print recently arrived Cash orders that were loaded via database/state sync
+  // Also auto-print recently placed orders synced from database/storage
   useEffect(() => {
     if (!autoPrintEnabled) return;
     orders.forEach(order => {
-      if (order.isPaid || order.isBilled) return;
-      if (order.paymentMethod === 'cash' || order.autoPrintRequested) {
-        const ageInMs = Date.now() - new Date(order.createdAt || 0).getTime();
-        if (ageInMs < 20000 && !autoPrintedOrderIdsRef.current.has(order.id)) {
-          autoPrintedOrderIdsRef.current.add(order.id);
-          markOrderBilled(order.id);
-          const bill = generateBill(order.id);
-          setPrintData({
-            type: 'kot',
-            roundNumber: 1,
-            order,
-            tableName: order.tableName,
-            customerName: order.customerName,
-            bill
-          });
-          setSettledToast({
-            title: `🖨️ Auto-Printed Bill & KOT`,
-            message: `${order.tableName} • ${order.customerName} • Cash on Delivery`
-          });
-          setTimeout(() => {
-            window.print();
-          }, 300);
-        }
+      if (order.isSettled || order.status === 'settled' || order.status === 'archived') return;
+      const ageInMs = Date.now() - new Date(order.createdAt || 0).getTime();
+      if (ageInMs < 25000 && !autoPrintedOrderIdsRef.current.has(order.id)) {
+        autoPrintedOrderIdsRef.current.add(order.id);
+        markOrderBilled(order.id);
+        const bill = generateBill(order.id);
+        setPrintData({
+          type: 'kot',
+          roundNumber: order.roundNumber || 1,
+          order,
+          tableName: order.tableName,
+          customerName: order.customerName,
+          bill
+        });
+        const modeText = order.paymentMethod === 'upi' ? 'Paid via UPI' : 'Cash on Delivery';
+        setSettledToast({
+          title: `🖨️ KOT Sent to Billing Machine`,
+          message: `${order.tableName} • ${order.customerName} • ${modeText} • Tear & Give to Kitchen`
+        });
+        setTimeout(() => {
+          window.print();
+        }, 250);
       }
     });
   }, [orders, autoPrintEnabled, markOrderBilled, generateBill]);
 
   const currency = restaurant.billing?.currency || '₹';
 
-  // 1. ONLY ACTIVE UNPAID ORDERS appear in this screen
+  // 1. ACTIVE DINING ORDERS: table sessions currently dining (not yet settled/cleared by admin)
   const activeUnpaidOrders = useMemo(() => {
-    return orders.filter(o => !(o.isPaid || o.paymentStatus === 'paid' || o.status === 'paid'));
+    return orders.filter(o => !o.isSettled && o.status !== 'settled' && o.status !== 'archived');
   }, [orders]);
 
   // 2. BUILD TABLE-BASED STRUCTURE (Matching the exact layout in the handwritten sketch)
@@ -402,7 +400,7 @@ export default function AdminOrdersPage() {
   const handleOpenCombinedUpi = (e, customer) => {
     if (e) e.stopPropagation();
 
-    const upiId = restaurant.billing?.upiId || 'naachicafe@okaxis';
+    const upiId = restaurant.billing?.upiId || 'palanikathirvel05@okaxis';
     const payeeName = restaurant.billing?.upiPayeeName || restaurant.name || 'Naachi Café';
     const note = `Bill ${customer.tableName} (${customer.orderNumbers.join(', ')})`;
 
@@ -747,9 +745,23 @@ export default function AdminOrdersPage() {
                                       </span>
                                     </div>
 
-                                    {/* Summary of dishes in this round */}
-                                    <div className="text-[11px] text-charcoal-700 bg-slate-50/80 p-1.5 rounded-lg border border-slate-100">
-                                      {round.items?.map(it => `${it.quantity}x ${it.itemName}`).join(', ')}
+                                    {/* Summary of dishes in this round with quantities & notes */}
+                                    <div className="space-y-1 bg-white p-2 rounded-xl border border-slate-200">
+                                      {round.items?.map((it, idx) => (
+                                        <div key={idx} className="flex items-center justify-between text-xs py-0.5">
+                                          <span className="font-semibold text-charcoal-900">
+                                            {it.quantity}x {it.itemName}
+                                          </span>
+                                          <span className="text-charcoal-500 font-mono text-[11px]">
+                                            {formatCurrency(it.lineTotal, currency)}
+                                          </span>
+                                        </div>
+                                      ))}
+                                      {round.specialInstructions && (
+                                        <div className="mt-1 text-[10px] text-amber-900 bg-amber-50 px-2 py-0.5 rounded border border-amber-200 font-medium">
+                                          📝 Note: {round.specialInstructions}
+                                        </div>
+                                      )}
                                     </div>
 
                                     {/* Side-by-side [Bill] and [details] buttons exactly as in sketch */}
@@ -793,19 +805,30 @@ export default function AdminOrdersPage() {
                               <span className="text-charcoal-500 font-semibold uppercase tracking-wider text-[10px]">
                                 Combined Total ({customer.roundCount} {customer.roundCount === 1 ? 'Round' : 'Rounds'})
                               </span>
-                              <span className="font-serif font-bold text-base text-forest-900">
-                                {formatCurrency(customer.combinedTotal, currency)}
-                              </span>
+                              <div className="text-right">
+                                <span className="font-serif font-bold text-base text-forest-900 block">
+                                  {formatCurrency(customer.combinedTotal, currency)}
+                                </span>
+                                {isUpiPayment ? (
+                                  <span className="text-[10px] font-bold text-purple-700 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                    PAID ONLINE (UPI)
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                                    TO COLLECT AT COUNTER
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
-                            {/* [Pay bill] and [Paid] Buttons */}
+                            {/* [Pay bill] and [Paid] / [Clear Table] Buttons */}
                             <div className="grid grid-cols-2 gap-2">
                               {/* [Pay bill]: Shows dynamic UPI QR for Round 1 + Round 2 */}
                               <button
                                 type="button"
                                 onClick={(e) => handleOpenCombinedUpi(e, customer)}
                                 className="w-full py-2 px-3 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                                title="Generate combined UPI QR for all rounds"
+                                title="Show combined UPI QR for payment"
                               >
                                 <QrCode className="w-3.5 h-3.5 text-amber-200" />
                                 <span>Pay bill</span>
@@ -814,12 +837,12 @@ export default function AdminOrdersPage() {
                               {/* [Paid]: Marks order as paid, disappears from table, stored in history */}
                               <button
                                 type="button"
-                                onClick={(e) => handleMarkCustomerPaid(e, customer, 'Counter')}
+                                onClick={(e) => handleMarkCustomerPaid(e, customer, isUpiPayment ? 'Online UPI' : 'Counter Cash')}
                                 className="w-full py-2 px-3 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 shadow-sm active:scale-95"
-                                title="Mark bill as Paid: tab closes and moves to History"
+                                title="Mark bill as Paid & Settled: table clears and moves to History"
                               >
                                 <Check className="w-3.5 h-3.5" />
-                                <span>Paid</span>
+                                <span>{isUpiPayment ? 'Clear Table' : 'Paid'}</span>
                               </button>
                             </div>
                           </div>
@@ -1027,66 +1050,75 @@ export default function AdminOrdersPage() {
       {/* HIDDEN PRINT RECEIPT (KOT OR COMBINED BILL)                               */}
       {/* ========================================================================= */}
       {printData && (
-        <div id="printable-receipt" className="hidden print:block font-mono text-xs text-black p-4">
-          <div className="text-center pb-2 border-b border-dashed border-black">
-            <h2 className="font-bold text-base uppercase">{restaurant.name}</h2>
-            <p className="text-[11px]">{restaurant.address}</p>
-            <div className="mt-1 font-bold text-sm bg-black text-white py-0.5">
-              {printData.type === 'kot' ? `KITCHEN ORDER TICKET (ROUND ${printData.roundNumber})` : 'FINAL DINING RECEIPT'}
+        <div id="printable-receipt" className="hidden print:block font-mono text-xs text-black p-4 max-w-[360px] mx-auto">
+          <div className="text-center pb-2 border-b-2 border-black">
+            <h2 className="font-bold text-base uppercase tracking-wider">{restaurant.name}</h2>
+            <div className="my-1 font-black text-xs bg-black text-white py-0.5 uppercase tracking-wider">
+              *** KITCHEN ORDER TICKET (KOT) ***
             </div>
-            <div className="font-bold text-sm mt-1">
+            <div className="font-black text-xl mt-1 py-1 border-2 border-black">
               TABLE: {printData.tableName || printData.order?.tableName}
             </div>
           </div>
 
-          <div className="py-2 border-b border-dashed border-black text-[11px]">
+          <div className="py-2 border-b border-dashed border-black text-[11px] space-y-0.5">
             <div>
-              Order: {printData.order?.orderNumber} &bull; Time: {formatTime(new Date().toISOString())}
+              <strong>Order #:</strong> {printData.order?.orderNumber} &bull; <strong>Time:</strong> {formatTime(new Date().toISOString())}
             </div>
             <div>
-              Guest: {printData.customerName || printData.order?.customerName} 
+              <strong>Guest:</strong> {printData.customerName || printData.order?.customerName} ({printData.order?.customerPhone || 'N/A'})
             </div>
             <div className="font-bold">
-              Payment: {printData.order?.paymentMethod === 'upi' ? `ONLINE UPI (To Owner: ${restaurant.billing?.upiId || 'naachicafe@okaxis'})` : 'CASH ON DELIVERY (COLLECT AT DESK)'}
+              <strong>Payment:</strong> {printData.order?.paymentMethod === 'upi' ? `PAID ONLINE (UPI) • UTR: ${printData.order?.upiRef || 'Verified'}` : 'CASH ON DELIVERY (COLLECT AT DESK)'}
             </div>
-            {printData.order?.upiRef && (
-              <div>
-                UPI UTR / Ref: {printData.order?.upiRef}
-              </div>
-            )}
           </div>
 
-          <div className="py-2 border-b border-dashed border-black">
-            <table className="w-full">
+          {/* Kitchen Note if present */}
+          {printData.order?.specialInstructions && (
+            <div className="my-1.5 p-1 border-2 border-black font-bold text-xs bg-slate-100">
+              ⚠️ KITCHEN NOTE: {printData.order.specialInstructions}
+            </div>
+          )}
+
+          <div className="py-2 border-b border-black">
+            <table className="w-full text-xs">
               <thead>
-                <tr className="border-b border-black text-[10px] uppercase">
-                  <th className="text-left">Dish</th>
-                  <th className="text-center">Wait</th>
-                  <th className="text-center">Qty</th>
-                  <th className="text-right">Amt</th>
+                <tr className="border-b-2 border-black text-[10px] uppercase">
+                  <th className="text-left py-1">Dish Name</th>
+                  <th className="text-center py-1">Qty</th>
+                  <th className="text-center py-1">Prep</th>
+                  <th className="text-right py-1">Amt</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody className="divide-y divide-dashed divide-black">
                 {printData.order?.items?.map((it, idx) => (
-                  <tr key={idx}>
-                    <td className="text-left">{it.itemName}</td>
-                    <td className="text-center">{it.prepTime || 10}m</td>
-                    <td className="text-center">{it.quantity}</td>
-                    <td className="text-right">{it.lineTotal.toFixed(2)}</td>
+                  <tr key={idx} className="font-semibold">
+                    <td className="text-left py-1">
+                      <span className="font-bold">{it.itemName}</span>
+                      {it.specialInstructions && (
+                        <div className="text-[10px] italic font-normal">
+                          &bull; {it.specialInstructions}
+                        </div>
+                      )}
+                    </td>
+                    <td className="text-center py-1 font-bold text-sm">{it.quantity}</td>
+                    <td className="text-center py-1">{it.prepTime || 10}m</td>
+                    <td className="text-right py-1">{it.lineTotal.toFixed(2)}</td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
 
-          <div className="py-2 text-right font-bold text-sm">
-            <div>
-              TOTAL: {currency}{printData.order?.total?.toFixed(2)}
-            </div>
+          <div className="py-2 text-right font-black text-sm border-b border-dashed border-black">
+            TOTAL: {currency}{printData.order?.total?.toFixed(2)}
           </div>
 
-          <div className="text-center text-[10px] pt-2">
-            <p>*** CHEF PREPARATION COPY ***</p>
+          <div className="text-center pt-2 space-y-0.5">
+            <div className="border-t border-dashed border-black pt-1 font-bold text-xs tracking-wider">
+              - - - - - - TEAR &amp; GIVE TO KITCHEN - - - - - -
+            </div>
+            <p className="text-[10px] font-bold">*** CHEF PREPARATION COPY ***</p>
           </div>
         </div>
       )}
