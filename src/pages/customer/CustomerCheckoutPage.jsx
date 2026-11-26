@@ -20,7 +20,8 @@ import {
   ExternalLink,
   X,
   Sparkles,
-  ShieldAlert
+  ShieldAlert,
+  Copy
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useRestaurant } from '../../context/RestaurantContext';
@@ -60,6 +61,15 @@ export default function CustomerCheckoutPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const [qrDisplayMode, setQrDisplayMode] = useState('stand'); // 'stand' | 'dynamic'
+  const [copiedUpi, setCopiedUpi] = useState(false);
+
+  const handleCopyUpiId = () => {
+    try {
+      navigator.clipboard.writeText(upiId);
+      setCopiedUpi(true);
+      setTimeout(() => setCopiedUpi(false), 2500);
+    } catch (e) {}
+  };
 
   const billingConfig = restaurant.billing || {};
   const totals = calculateTotals(billingConfig);
@@ -590,15 +600,49 @@ export default function CustomerCheckoutPage() {
                           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                           <span>Payee: <strong className="text-purple-950">{upiPayeeName}</strong></span>
                         </div>
-                        <div className="font-mono text-[11px] text-charcoal-700 bg-purple-50 px-2.5 py-0.5 rounded-md inline-block border border-purple-200">
-                          UPI ID: <strong>{upiId}</strong>
+                        
+                        <div className="flex items-center justify-center gap-1.5 pt-0.5">
+                          <div className="font-mono text-[11px] text-charcoal-700 bg-purple-50 px-2.5 py-1 rounded-md inline-flex items-center gap-2 border border-purple-200">
+                            <span>UPI ID: <strong>{upiId}</strong></span>
+                            <button
+                              type="button"
+                              onClick={handleCopyUpiId}
+                              className="text-purple-700 hover:text-purple-900 font-sans font-bold text-[10px] bg-purple-100 hover:bg-purple-200 px-1.5 py-0.5 rounded transition flex items-center gap-0.5"
+                              title="Copy UPI ID"
+                            >
+                              {copiedUpi ? (
+                                <>
+                                  <Check className="w-2.5 h-2.5 text-emerald-600" />
+                                  <span className="text-emerald-700 font-bold">Copied!</span>
+                                </>
+                              ) : (
+                                <>
+                                  <Copy className="w-2.5 h-2.5" />
+                                  <span>Copy</span>
+                                </>
+                              )}
+                            </button>
+                          </div>
                         </div>
+
                         <div className="text-[11px] text-charcoal-500 font-medium">
                           Bank: <strong>{upiBankName}</strong>
                         </div>
                         <div className="font-serif font-bold text-forest-800 text-sm">
                           Amount to Pay: {formatCurrency(totals.grandTotal, currency)}
                         </div>
+                      </div>
+
+                      {/* Helpful diagnostic tip for "Bank Limit Exceeded" during testing */}
+                      <div className="text-[10px] text-amber-900 bg-amber-50/80 p-2.5 rounded-xl border border-amber-200 text-left space-y-1">
+                        <div className="font-bold flex items-center gap-1 text-amber-800">
+                          <AlertCircle className="w-3.5 h-3.5 flex-shrink-0 text-amber-600" />
+                          <span>Seeing &ldquo;Bank Limit Exceeded&rdquo; in Google Pay?</span>
+                        </div>
+                        <p className="leading-relaxed text-charcoal-700">
+                          &bull; <strong>Testing self-transfer:</strong> Banks forbid paying your own UPI ID from the same bank account. Test using a family member or friend&rsquo;s phone &amp; different bank.<br />
+                          &bull; <strong>Daily count cap:</strong> Banks restrict users to 10&ndash;20 UPI attempts per day. Try switching your sending bank inside GPay.
+                        </p>
                       </div>
 
                       <div className="pt-2">
