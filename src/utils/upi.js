@@ -8,7 +8,8 @@ export function generateUpiUri({
   payeeName = 'Naachi Café',
   amount = 0,
   transactionNote = 'Restaurant Bill',
-  orderRef = ''
+  orderRef = '',
+  callbackUrl = ''
 }) {
   const cleanUpi = encodeURIComponent(upiId ? upiId.trim() : 'naachicafe@okaxis');
   const cleanName = encodeURIComponent(payeeName ? payeeName.trim() : 'Restaurant');
@@ -16,5 +17,9 @@ export function generateUpiUri({
   const cleanNote = encodeURIComponent(transactionNote ? transactionNote.trim() : 'Dining Bill');
   const cleanRef = encodeURIComponent(orderRef ? orderRef.trim() : `ORD-${Date.now().toString(36)}`);
 
-  return `upi://pay?pa=${cleanUpi}&pn=${cleanName}&am=${cleanAmount}&cu=INR&tn=${cleanNote}&tr=${cleanRef}`;
+  let uri = `upi://pay?pa=${cleanUpi}&pn=${cleanName}&am=${cleanAmount}&cu=INR&tn=${cleanNote}&tr=${cleanRef}`;
+  if (callbackUrl) {
+    uri += `&url=${encodeURIComponent(callbackUrl)}`;
+  }
+  return uri;
 }

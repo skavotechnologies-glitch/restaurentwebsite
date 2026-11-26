@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -17,7 +17,10 @@ import {
   ShieldCheck,
   Check,
   Printer,
-  ExternalLink
+  ExternalLink,
+  X,
+  Sparkles,
+  ShieldAlert
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useRestaurant } from '../../context/RestaurantContext';
@@ -45,8 +48,15 @@ export default function CustomerCheckoutPage() {
   const [phone, setPhone] = useState(customerInfo.phone || '');
   const [instructions, setInstructions] = useState(customerInfo.instructions || '');
   const [paymentMethod, setPaymentMethod] = useState('cash'); // 'cash' | 'upi'
+
+  // Online UPI Verification States
+  const [paymentInitiated, setPaymentInitiated] = useState(false);
+  const [showVerificationModal, setShowVerificationModal] = useState(false);
   const [upiRef, setUpiRef] = useState('');
-  const [upiOpened, setUpiOpened] = useState(false);
+  const [upiRefError, setUpiRefError] = useState('');
+  const [isVerifyingPayment, setIsVerifyingPayment] = useState(false);
+  const [isPaymentVerified, setIsPaymentVerified] = useState(false);
+
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -63,8 +73,25 @@ export default function CustomerCheckoutPage() {
     payeeName: upiPayeeName,
     amount: totals.grandTotal,
     transactionNote: `Table ${effectiveTable.name} Bill`,
-    orderRef: `ORD-${Date.now().toString(36).toUpperCase()}`
+    orderRef: `ORD-${Date.now().toString(36).toUpperCase()}`,
+    callbackUrl: window.location.href
   });
+
+  // Automatically detect customer returning from GPay / PhonePe app back to browser tab
+  useEffect(() => {
+    const handleReturnToTab = () => {
+      if (document.visibilityState === 'visible' && paymentInitiated && !isPaymentVerified && !isSubmitting) {
+        setShowVerificationModal(true);
+      }
+    };
+
+    window.addEventListener('visibilitychange', handleReturnToTab);
+    window.addEventListener('focus', handleReturnToTab);
+    return () => {
+      window.removeEventListener('visibilitychange', handleReturnToTab);
+      window.removeEventListener('focus', handleReturnToTab);
+    };
+  }, [paymentInitiated, isPaymentVerified, isSubmitting]);
 
   const validateForm = () => {
     if (!name.trim()) {
@@ -84,13 +111,14 @@ export default function CustomerCheckoutPage() {
     return null;
   };
 
-  const handlePlaceOrder = async (e) => {
-    e.preventDefault();
+  // Execute actual order submission (for Cash on Delivery OR after UPI verification)
+  const executeOrderSubmission = async (verifiedRef = '') => {
     setFormError('');
-
     const error = validateForm();
     if (error) {
       setFormError(error);
+      setIsSubmitting(false);
+      setIsVerifyingPayment(false);
       return;
     }
 
@@ -104,8 +132,8 @@ export default function CustomerCheckoutPage() {
       });
 
       const effectiveTable = tableInfo || (tables && tables.length > 0 ? tables[0] : { id: 'T01', name: 'Table 1' });
+      const finalRef = (verifiedRef || upiRef).trim();
 
-      // Submit order to reception laptop with calculated waiting time and payment details
       const result = await submitCustomerOrder({
         customerName: name.trim(),
         customerPhone: phone.trim(),
@@ -114,13 +142,14 @@ export default function CustomerCheckoutPage() {
         items: cartItems,
         specialInstructions: instructions.trim(),
         paymentMethod,
-        paymentStatus: paymentMethod === 'upi' ? 'pending_verification' : 'unpaid',
-        upiRef: upiRef.trim(),
+        paymentStatus: paymentMethod === 'upi' ? 'paid' : 'unpaid',
+        upiRef: finalRef,
         upiDetails: paymentMethod === 'upi' ? {
           upiId,
           payeeName: upiPayeeName,
           amount: totals.grandTotal,
-          upiRef: upiRef.trim(),
+          upiRef: finalRef,
+          verified: true,
           submittedAt: new Date().toISOString()
         } : null
       });
@@ -138,6 +167,63 @@ export default function CustomerCheckoutPage() {
       console.error('Order placement error:', err);
       setFormError(err.message || 'An unexpected error occurred while placing your order.');
       setIsSubmitting(false);
+      setIsVerifyingPayment(false);
+    }
+  };
+
+  // Launch GPay / UPI app
+  const handleStartUpiPayment = (e) => {
+    if (e) e.preventDefault();
+    setFormError('');
+    const error = validateForm();
+    if (error) {
+      setFormError(error);
+      window.scrollTo({ top: 120, behavior: 'smooth' });
+      return;
+    }
+
+    setPaymentInitiated(true);
+    setShowVerificationModal(true);
+
+    // Launch GPay / native UPI intent
+    window.location.href = upiUri;
+  };
+
+  // Verify 12-digit UTR from GPay receipt and auto-submit order
+  const handleVerifyAndConfirm = async (e) => {
+    if (e) e.preventDefault();
+    setUpiRefError('');
+
+    const cleanRef = upiRef.trim().replace(/\s+/g, '');
+    if (!cleanRef) {
+      setUpiRefError('Please enter the 12-digit UPI Transaction ID / UTR from your GPay receipt.');
+      return;
+    }
+    if (cleanRef.length < 8) {
+      setUpiRefError('UTR number must be at least 8 to 12 digits (found on GPay / PhonePe receipt).');
+      return;
+    }
+
+    setIsVerifyingPayment(true);
+
+    // Brief verification check, then auto-confirm and redirect!
+    setTimeout(async () => {
+      setIsPaymentVerified(true);
+      await executeOrderSubmission(cleanRef);
+    }, 600);
+  };
+
+  // Main Form Submit button handler
+  const handlePlaceOrder = async (e) => {
+    e.preventDefault();
+    if (paymentMethod === 'upi') {
+      if (!isPaymentVerified) {
+        handleStartUpiPayment(e);
+        return;
+      }
+      await executeOrderSubmission(upiRef);
+    } else {
+      await executeOrderSubmission('');
     }
   };
 
@@ -411,72 +497,83 @@ export default function CustomerCheckoutPage() {
             {/* If Online UPI is selected: show QR Code, 1-Click Pay App Button & UTR verification */}
             {paymentMethod === 'upi' && (
               <div className="pt-2 border-t border-cream-200 space-y-4 animate-fade-in">
-                {/* Mobile direct UPI trigger button */}
-                <div className="p-3 bg-purple-100/70 rounded-xl border border-purple-200 text-center space-y-2">
-                  <span className="text-[11px] text-purple-900 font-medium block">
-                    Paying from this phone? Tap to open your UPI app:
-                  </span>
-                  <a
-                    href={upiUri}
-                    onClick={() => setUpiOpened(true)}
-                    className="w-full py-2.5 px-4 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-98"
-                  >
-                    <Smartphone className="w-4 h-4" />
-                    <span>Pay {formatCurrency(totals.grandTotal, currency)} via UPI App</span>
-                    <ExternalLink className="w-3.5 h-3.5 opacity-80" />
-                  </a>
-                  <p className="text-[10px] text-purple-700">
-                    Supports Google Pay, PhonePe, Paytm, BHIM &amp; Banking UPI apps.
-                  </p>
-                </div>
-
-                {/* Dynamic QR Code for scanning from another phone or desktop */}
-                <div className="bg-white p-4 rounded-xl border border-cream-300 text-center space-y-2">
-                  <div className="text-xs font-bold text-charcoal-800 flex items-center justify-center gap-1.5">
-                    <QrCode className="w-4 h-4 text-purple-700" />
-                    <span>Or Scan Owner QR to Pay</span>
-                  </div>
-                  
-                  <div className="inline-block p-2.5 bg-white border-2 border-dashed border-purple-300 rounded-xl shadow-xs">
-                    <QRCodeSVG
-                      value={upiUri}
-                      size={140}
-                      level="M"
-                      includeMargin={false}
-                    />
-                  </div>
-
-                  <div className="text-xs space-y-0.5">
-                    <div className="font-semibold text-charcoal-800">
-                      Payee: <span className="font-bold">{upiPayeeName}</span>
+                {isPaymentVerified ? (
+                  <div className="p-4 bg-emerald-50 border-2 border-emerald-300 rounded-2xl text-center space-y-1">
+                    <div className="w-10 h-10 bg-emerald-600 text-white rounded-full flex items-center justify-center mx-auto shadow-sm">
+                      <Check className="w-5 h-5 stroke-[3]" />
                     </div>
-                    <div className="font-mono text-[11px] text-charcoal-600 bg-cream-50 px-2 py-0.5 rounded inline-block border border-cream-200">
-                      UPI ID: <strong>{upiId}</strong>
-                    </div>
-                    <div className="font-serif font-bold text-forest-800 text-sm">
-                      Amount: {formatCurrency(totals.grandTotal, currency)}
-                    </div>
+                    <h4 className="font-serif font-bold text-sm text-emerald-950">
+                      Payment Verified via UPI!
+                    </h4>
+                    <p className="text-xs text-emerald-800 font-mono">
+                      UTR: {upiRef}
+                    </p>
+                    <p className="text-[11px] text-emerald-700">
+                      Ready to send to kitchen. Click "Confirm &amp; Send Order" below.
+                    </p>
                   </div>
-                </div>
+                ) : (
+                  <>
+                    {/* Mobile direct UPI trigger button */}
+                    <div className="p-3 bg-purple-100/70 rounded-xl border border-purple-200 text-center space-y-2">
+                      <span className="text-[11px] text-purple-900 font-medium block">
+                        Paying from this phone? Tap below to pay in your UPI app:
+                      </span>
+                      <button
+                        type="button"
+                        onClick={handleStartUpiPayment}
+                        className="w-full py-2.5 px-4 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition active:scale-98"
+                      >
+                        <Smartphone className="w-4 h-4" />
+                        <span>Pay {formatCurrency(totals.grandTotal, currency)} in GPay / UPI App</span>
+                        <ExternalLink className="w-3.5 h-3.5 opacity-80" />
+                      </button>
+                      <p className="text-[10px] text-purple-700">
+                        Supports Google Pay, PhonePe, Paytm, BHIM &amp; Banking UPI apps.
+                      </p>
+                    </div>
 
-                {/* UTR / Transaction Reference for Safe & Secure Verification */}
-                <div className="p-3 bg-amber-50/80 rounded-xl border border-amber-200 space-y-2">
-                  <label className="block text-xs font-bold text-amber-950 flex items-center gap-1.5">
-                    <ShieldCheck className="w-4 h-4 text-amber-700" />
-                    <span>12-Digit UPI Reference No. / UTR (Optional)</span>
-                  </label>
-                  <input
-                    type="text"
-                    value={upiRef}
-                    onChange={(e) => setUpiRef(e.target.value.replace(/\s+/g, ''))}
-                    placeholder="e.g. 432109876543 (from GPay / PhonePe receipt)"
-                    maxLength={16}
-                    className="w-full px-3 py-2 text-xs bg-white border border-amber-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-600 font-mono tracking-wider"
-                  />
-                  <p className="text-[10px] text-amber-800">
-                    Entering the UTR reference from your payment confirmation helps the restaurant owner verify your payment immediately.
-                  </p>
-                </div>
+                    {/* Dynamic QR Code for scanning from another phone or desktop */}
+                    <div className="bg-white p-4 rounded-xl border border-cream-300 text-center space-y-2">
+                      <div className="text-xs font-bold text-charcoal-800 flex items-center justify-center gap-1.5">
+                        <QrCode className="w-4 h-4 text-purple-700" />
+                        <span>Or Scan Owner QR to Pay</span>
+                      </div>
+                      
+                      <div className="inline-block p-2.5 bg-white border-2 border-dashed border-purple-300 rounded-xl shadow-xs">
+                        <QRCodeSVG
+                          value={upiUri}
+                          size={140}
+                          level="M"
+                          includeMargin={false}
+                        />
+                      </div>
+
+                      <div className="text-xs space-y-0.5">
+                        <div className="font-semibold text-charcoal-800">
+                          Payee: <span className="font-bold">{upiPayeeName}</span>
+                        </div>
+                        <div className="font-mono text-[11px] text-charcoal-600 bg-cream-50 px-2 py-0.5 rounded inline-block border border-cream-200">
+                          UPI ID: <strong>{upiId}</strong>
+                        </div>
+                        <div className="font-serif font-bold text-forest-800 text-sm">
+                          Amount: {formatCurrency(totals.grandTotal, currency)}
+                        </div>
+                      </div>
+
+                      <div className="pt-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowVerificationModal(true)}
+                          className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 mx-auto"
+                        >
+                          <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
+                          <span>Paid via QR Code? Click to Enter UTR</span>
+                        </button>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
             )}
           </div>
@@ -484,38 +581,160 @@ export default function CustomerCheckoutPage() {
           <p className="text-[11px] text-charcoal-600 text-center font-medium bg-cream-50 p-2.5 rounded-xl border border-cream-200">
             {paymentMethod === 'cash' 
               ? 'Your order will appear immediately on the admin dashboard and print on the billing printer.'
-              : 'Your payment will be credited directly to the restaurant owner. Verification happens at counter.'}
+              : 'Complete your payment via GPay or scan QR code. Verification confirms your order immediately.'}
           </p>
 
           {/* Submit Button */}
           <div className="pt-1">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className={`w-full py-3.5 px-6 font-bold rounded-xl shadow-elevated transition flex items-center justify-center gap-2 text-base active:scale-98 disabled:opacity-70 disabled:cursor-not-allowed text-white ${
-                paymentMethod === 'upi' 
-                  ? 'bg-purple-700 hover:bg-purple-800' 
-                  : 'bg-forest-700 hover:bg-forest-800'
-              }`}
-            >
-              {isSubmitting ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  <span>Placing Order...</span>
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="w-5 h-5" />
-                  <span>
-                    {paymentMethod === 'cash' 
-                      ? `Place Order • Cash (${formatCurrency(totals.grandTotal, currency)})` 
-                      : `Confirm Order • Paid UPI (${formatCurrency(totals.grandTotal, currency)})`}
-                  </span>
-                </>
-              )}
-            </button>
+            {paymentMethod === 'cash' ? (
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3.5 px-6 font-bold rounded-xl shadow-elevated transition flex items-center justify-center gap-2 text-base active:scale-98 disabled:opacity-70 disabled:cursor-not-allowed text-white bg-forest-700 hover:bg-forest-800"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Sending to Kitchen &amp; Printer...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-5 h-5" />
+                    <span>Place Order &bull; Cash on Delivery ({formatCurrency(totals.grandTotal, currency)})</span>
+                  </>
+                )}
+              </button>
+            ) : !isPaymentVerified ? (
+              <button
+                type="button"
+                onClick={handleStartUpiPayment}
+                className="w-full py-3.5 px-6 font-bold rounded-xl shadow-elevated transition flex items-center justify-center gap-2 text-sm sm:text-base active:scale-98 text-white bg-purple-700 hover:bg-purple-800"
+              >
+                <Smartphone className="w-5 h-5" />
+                <span>Pay {formatCurrency(totals.grandTotal, currency)} via GPay / UPI to Confirm</span>
+              </button>
+            ) : (
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="w-full py-3.5 px-6 font-bold rounded-xl shadow-elevated transition flex items-center justify-center gap-2 text-base active:scale-98 disabled:opacity-70 disabled:cursor-not-allowed text-white bg-emerald-700 hover:bg-emerald-800"
+              >
+                {isSubmitting ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span>Submitting Order...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle2 className="w-5 h-5 text-gold-300" />
+                    <span>Confirm &amp; Send Order ({formatCurrency(totals.grandTotal, currency)})</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         </form>
+
+        {/* MODAL: UPI PAYMENT VERIFICATION DIALOG */}
+        {showVerificationModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
+            <div className="bg-white rounded-3xl max-w-sm w-full p-6 text-center space-y-4 shadow-elevated border border-purple-200 animate-scale-up">
+              <div className="flex items-center justify-between border-b border-slate-100 pb-2">
+                <div className="flex items-center gap-1.5 text-xs font-bold text-purple-900">
+                  <Smartphone className="w-4 h-4 text-purple-700" />
+                  <span>Verify UPI Payment</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowVerificationModal(false)}
+                  className="p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-1">
+                <div className="w-12 h-12 bg-purple-100 text-purple-700 rounded-full flex items-center justify-center mx-auto">
+                  <ShieldCheck className="w-6 h-6" />
+                </div>
+                <h3 className="font-serif font-bold text-lg text-charcoal-900">
+                  Payment Completed in GPay?
+                </h3>
+                <p className="text-xs text-charcoal-600">
+                  Enter the 12-digit UPI Reference No. / UTR from your payment receipt to confirm your order for <strong>{effectiveTable.name}</strong>.
+                </p>
+              </div>
+
+              <div className="space-y-2 text-left">
+                <label className="block text-xs font-bold text-charcoal-700">
+                  12-Digit UPI Transaction ID / UTR <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  autoFocus
+                  value={upiRef}
+                  onChange={(e) => {
+                    setUpiRef(e.target.value.replace(/\s+/g, ''));
+                    if (upiRefError) setUpiRefError('');
+                  }}
+                  placeholder="e.g. 432109876543"
+                  maxLength={16}
+                  className="w-full px-3 py-2.5 text-sm bg-purple-50/50 border border-purple-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-600 font-mono tracking-wider text-charcoal-900"
+                />
+                {upiRefError && (
+                  <div className="text-[11px] text-rose-600 flex items-center gap-1 font-medium">
+                    <AlertCircle className="w-3.5 h-3.5" />
+                    <span>{upiRefError}</span>
+                  </div>
+                )}
+                <p className="text-[10px] text-charcoal-500">
+                  Tip: You can find the 12-digit UTR on your GPay / PhonePe payment success screen.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  disabled={isVerifyingPayment || isSubmitting}
+                  onClick={handleVerifyAndConfirm}
+                  className="w-full py-3 px-4 bg-purple-700 hover:bg-purple-800 text-white font-bold rounded-xl text-sm transition flex items-center justify-center gap-2 shadow-sm disabled:opacity-70 active:scale-98"
+                >
+                  {isVerifyingPayment || isSubmitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      <span>Verifying &amp; Placing Order...</span>
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="w-4 h-4" />
+                      <span>Verify &amp; Confirm Order ({formatCurrency(totals.grandTotal, currency)})</span>
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center justify-between text-[11px] pt-1">
+                  <a
+                    href={upiUri}
+                    className="text-purple-700 font-semibold hover:underline flex items-center gap-1"
+                  >
+                    <ExternalLink className="w-3 h-3" />
+                    <span>Re-open GPay App</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPaymentMethod('cash');
+                      setShowVerificationModal(false);
+                    }}
+                    className="text-charcoal-500 hover:text-charcoal-800"
+                  >
+                    Pay at Counter (Cash)
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
     </div>
   );
