@@ -54,7 +54,7 @@ export default function AdminSettingsPage() {
     discountRate: restaurant.billing?.discountRate !== undefined ? restaurant.billing.discountRate.toString() : '0',
     gstin: restaurant.billing?.gstin || '',
     upiId: restaurant.billing?.upiId || 'palanikathirvel05@okaxis',
-    upiPayeeName: restaurant.billing?.upiPayeeName || restaurant.name || 'Naachi Café',
+    upiPayeeName: restaurant.billing?.upiPayeeName || 'Palani P.K__001',
     autoPrintCashOrders: restaurant.billing?.autoPrintCashOrders !== false,
     billFooterMessage: restaurant.billing?.billFooterMessage || 'Thank you for dining with us! Please visit again.'
   });
@@ -90,6 +90,9 @@ export default function AdminSettingsPage() {
         gstin: formData.gstin.trim(),
         upiId: formData.upiId.trim(),
         upiPayeeName: formData.upiPayeeName.trim(),
+        upiBankName: 'Indian Overseas Bank 2679',
+        upiAid: 'uGICAgMD27bClFw',
+        upiQrImage: '/images/cafe-upi-qr.jpg',
         autoPrintCashOrders: formData.autoPrintCashOrders,
         billFooterMessage: formData.billFooterMessage.trim()
       }
@@ -432,9 +435,34 @@ export default function AdminSettingsPage() {
                 type="text"
                 value={formData.upiPayeeName}
                 onChange={(e) => setFormData({ ...formData, upiPayeeName: e.target.value })}
-                placeholder="e.g. Naachi Café"
+                placeholder="e.g. Palani P.K__001"
                 className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 font-semibold"
               />
+            </div>
+
+            {/* Official Google Pay Stand Card Preview */}
+            <div className="col-span-full p-4 bg-purple-50/60 border border-purple-200 rounded-2xl flex flex-col sm:flex-row items-center gap-4">
+              <div className="w-24 h-32 rounded-xl overflow-hidden border border-purple-200 bg-white shadow-xs flex-shrink-0">
+                <img
+                  src="/images/cafe-upi-qr.jpg"
+                  alt="Official Cafe Google Pay Stand QR"
+                  className="w-full h-full object-cover"
+                />
+              </div>
+              <div className="space-y-1 text-center sm:text-left">
+                <span className="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full uppercase tracking-wider inline-block">
+                  Verified Google Pay Stand Linked
+                </span>
+                <h4 className="text-sm font-bold text-charcoal-900">
+                  {formData.upiPayeeName || 'Palani P.K__001'} &bull; Indian Overseas Bank 2679
+                </h4>
+                <p className="text-xs text-charcoal-600">
+                  Account ID (AID): <code className="font-mono text-purple-900 font-bold">uGICAgMD27bClFw</code> &bull; VPA: <code className="font-mono text-purple-900 font-bold">{formData.upiId}</code>
+                </p>
+                <p className="text-[11px] text-slate-500">
+                  Official physical stand QR card is embedded in customer checkout, order tracking, and billing counter modals.
+                </p>
+              </div>
             </div>
 
             <div className="col-span-full p-3.5 bg-forest-50/70 border border-forest-200 rounded-xl flex items-center justify-between">

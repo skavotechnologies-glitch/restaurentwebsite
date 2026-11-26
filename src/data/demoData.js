@@ -38,7 +38,10 @@ export const DEMO_RESTAURANT = {
     discountRate: 0,
     gstin: "29AAAAA0000A1Z5",
     upiId: "palanikathirvel05@okaxis",
-    upiPayeeName: "Naachi Café",
+    upiPayeeName: "Palani P.K__001",
+    upiBankName: "Indian Overseas Bank 2679",
+    upiAid: "uGICAgMD27bClFw",
+    upiQrImage: "/images/cafe-upi-qr.jpg",
     billFooterMessage: "Thank you for dining with Naachi Café! Please pay directly at the counter.",
   }
 };

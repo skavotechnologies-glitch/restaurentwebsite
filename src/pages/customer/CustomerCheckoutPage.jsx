@@ -59,13 +59,16 @@ export default function CustomerCheckoutPage() {
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [qrDisplayMode, setQrDisplayMode] = useState('stand'); // 'stand' | 'dynamic'
 
   const billingConfig = restaurant.billing || {};
   const totals = calculateTotals(billingConfig);
   const currency = billingConfig.currency || '₹';
 
   const upiId = billingConfig.upiId || 'palanikathirvel05@okaxis';
-  const upiPayeeName = billingConfig.upiPayeeName || restaurant.name || 'Restaurant Owner';
+  const upiPayeeName = billingConfig.upiPayeeName || 'Palani P.K__001';
+  const upiBankName = billingConfig.upiBankName || 'Indian Overseas Bank 2679';
+  const upiQrImage = billingConfig.upiQrImage || '/images/cafe-upi-qr.jpg';
   const effectiveTable = tableInfo || (tables && tables.length > 0 ? tables[0] : { id: 'T01', name: 'Table 1' });
 
   const upiUri = generateUpiUri({
@@ -74,7 +77,8 @@ export default function CustomerCheckoutPage() {
     amount: totals.grandTotal,
     transactionNote: `Table ${effectiveTable.name} Bill`,
     orderRef: `ORD-${Date.now().toString(36).toUpperCase()}`,
-    callbackUrl: window.location.href
+    callbackUrl: window.location.href,
+    aid: billingConfig.upiAid || 'uGICAgMD27bClFw'
   });
 
   // Automatically detect customer returning from GPay / PhonePe app back to browser tab
@@ -534,30 +538,66 @@ export default function CustomerCheckoutPage() {
                     </div>
 
                     {/* Dynamic QR Code for scanning from another phone or desktop */}
-                    <div className="bg-white p-4 rounded-xl border border-cream-300 text-center space-y-2">
+                    <div className="bg-white p-4 rounded-2xl border border-purple-200 text-center space-y-3 shadow-xs">
                       <div className="text-xs font-bold text-charcoal-800 flex items-center justify-center gap-1.5">
                         <QrCode className="w-4 h-4 text-purple-700" />
-                        <span>Or Scan Owner QR to Pay</span>
-                      </div>
-                      
-                      <div className="inline-block p-2.5 bg-white border-2 border-dashed border-purple-300 rounded-xl shadow-xs">
-                        <QRCodeSVG
-                          value={upiUri}
-                          size={140}
-                          level="M"
-                          includeMargin={false}
-                        />
+                        <span>Scan Official Google Pay QR to Pay</span>
                       </div>
 
-                      <div className="text-xs space-y-0.5">
-                        <div className="font-semibold text-charcoal-800">
-                          Payee: <span className="font-bold">{upiPayeeName}</span>
+                      {/* Display toggle between authentic GPay stand and auto-amount dynamic QR */}
+                      <div className="flex items-center justify-center gap-1 p-1 bg-cream-100 rounded-xl max-w-xs mx-auto text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setQrDisplayMode('stand')}
+                          className={`flex-1 py-1 px-2.5 rounded-lg font-bold transition text-[11px] ${
+                            qrDisplayMode === 'stand' ? 'bg-white text-purple-900 shadow-xs' : 'text-charcoal-600 hover:text-charcoal-900'
+                          }`}
+                        >
+                          Official GPay Stand
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setQrDisplayMode('dynamic')}
+                          className={`flex-1 py-1 px-2.5 rounded-lg font-bold transition text-[11px] ${
+                            qrDisplayMode === 'dynamic' ? 'bg-white text-purple-900 shadow-xs' : 'text-charcoal-600 hover:text-charcoal-900'
+                          }`}
+                        >
+                          Auto-Amount QR
+                        </button>
+                      </div>
+                      
+                      {qrDisplayMode === 'stand' ? (
+                        <div className="inline-block p-1 bg-white border border-purple-200 rounded-2xl shadow-sm max-w-[220px] overflow-hidden">
+                          <img
+                            src={upiQrImage}
+                            alt="Official Google Pay Stand QR - Palani P.K__001"
+                            className="w-full h-auto rounded-xl object-contain mx-auto"
+                          />
                         </div>
-                        <div className="font-mono text-[11px] text-charcoal-600 bg-cream-50 px-2 py-0.5 rounded inline-block border border-cream-200">
+                      ) : (
+                        <div className="inline-block p-3 bg-white border-2 border-dashed border-purple-300 rounded-xl shadow-xs">
+                          <QRCodeSVG
+                            value={upiUri}
+                            size={150}
+                            level="M"
+                            includeMargin={false}
+                          />
+                        </div>
+                      )}
+
+                      <div className="text-xs space-y-1">
+                        <div className="font-semibold text-charcoal-800 flex items-center justify-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                          <span>Payee: <strong className="text-purple-950">{upiPayeeName}</strong></span>
+                        </div>
+                        <div className="font-mono text-[11px] text-charcoal-700 bg-purple-50 px-2.5 py-0.5 rounded-md inline-block border border-purple-200">
                           UPI ID: <strong>{upiId}</strong>
                         </div>
+                        <div className="text-[11px] text-charcoal-500 font-medium">
+                          Bank: <strong>{upiBankName}</strong>
+                        </div>
                         <div className="font-serif font-bold text-forest-800 text-sm">
-                          Amount: {formatCurrency(totals.grandTotal, currency)}
+                          Amount to Pay: {formatCurrency(totals.grandTotal, currency)}
                         </div>
                       </div>
 
@@ -565,10 +605,10 @@ export default function CustomerCheckoutPage() {
                         <button
                           type="button"
                           onClick={() => setShowVerificationModal(true)}
-                          className="px-4 py-2 bg-purple-50 hover:bg-purple-100 text-purple-800 border border-purple-300 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 mx-auto"
+                          className="px-4 py-2.5 bg-purple-700 hover:bg-purple-800 text-white rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 mx-auto shadow-sm active:scale-98"
                         >
-                          <ShieldCheck className="w-3.5 h-3.5 text-purple-700" />
-                          <span>Paid via QR Code? Click to Enter UTR</span>
+                          <ShieldCheck className="w-4 h-4 text-purple-200" />
+                          <span>Paid via QR Code? Click to Enter 12-Digit UTR</span>
                         </button>
                       </div>
                     </div>

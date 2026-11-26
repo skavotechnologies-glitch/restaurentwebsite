@@ -22,6 +22,7 @@ export default function AdminBillingPage() {
   const [selectedOrderId, setSelectedOrderId] = useState(preselectedOrderId || '');
   const [printLayout, setPrintLayout] = useState('80mm'); // '80mm' | '58mm' | 'a4'
   const [billedNotice, setBilledNotice] = useState(false);
+  const [counterQrMode, setCounterQrMode] = useState('stand'); // 'stand' | 'dynamic'
 
   useEffect(() => {
     if (!selectedOrderId && orders.length > 0) {
@@ -126,22 +127,61 @@ export default function AdminBillingPage() {
                   <QrCode className="w-3.5 h-3.5 text-forest-700" />
                   <span>Counter QR: Pay {formatCurrency(selectedOrder.total, currency)}</span>
                 </span>
-                <div className="p-2 bg-white border border-slate-300 rounded-xl shadow-sm">
-                  <QRCodeSVG 
-                    value={generateUpiUri({
-                      upiId: restaurant.billing?.upiId || 'palanikathirvel05@okaxis',
-                      payeeName: restaurant.billing?.upiPayeeName || restaurant.name,
-                      amount: selectedOrder.total || 0,
-                      transactionNote: `Bill ${selectedOrder.orderNumber} ${selectedOrder.tableName}`,
-                      orderRef: selectedOrder.orderNumber
-                    })}
-                    size={120}
-                    level="M"
-                  />
+
+                {/* Switcher */}
+                <div className="flex items-center justify-center gap-1 p-0.5 bg-slate-200 rounded-lg text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setCounterQrMode('stand')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                      counterQrMode === 'stand' ? 'bg-white text-forest-900 shadow-xs' : 'text-slate-600'
+                    }`}
+                  >
+                    Official Stand QR
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCounterQrMode('dynamic')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold transition ${
+                      counterQrMode === 'dynamic' ? 'bg-white text-forest-900 shadow-xs' : 'text-slate-600'
+                    }`}
+                  >
+                    Dynamic Bill QR
+                  </button>
                 </div>
-                <p className="text-[10px] text-slate-500 font-mono">
-                  GPay &bull; PhonePe &bull; Paytm &bull; BHIM
-                </p>
+
+                {counterQrMode === 'stand' ? (
+                  <div className="p-1 bg-white border border-slate-300 rounded-xl shadow-sm max-w-[150px]">
+                    <img 
+                      src="/images/cafe-upi-qr.jpg" 
+                      alt="Official Cafe UPI QR" 
+                      className="w-full h-auto rounded-lg object-contain mx-auto"
+                    />
+                  </div>
+                ) : (
+                  <div className="p-2 bg-white border border-slate-300 rounded-xl shadow-sm">
+                    <QRCodeSVG 
+                      value={generateUpiUri({
+                        upiId: restaurant.billing?.upiId || 'palanikathirvel05@okaxis',
+                        payeeName: restaurant.billing?.upiPayeeName || 'Palani P.K__001',
+                        amount: selectedOrder.total || 0,
+                        transactionNote: `Bill ${selectedOrder.orderNumber} ${selectedOrder.tableName}`,
+                        orderRef: selectedOrder.orderNumber,
+                        aid: restaurant.billing?.upiAid || 'uGICAgMD27bClFw'
+                      })}
+                      size={120}
+                      level="M"
+                    />
+                  </div>
+                )}
+
+                <div className="text-[11px] text-charcoal-700 space-y-0.5">
+                  <div className="font-bold">{restaurant.billing?.upiPayeeName || 'Palani P.K__001'}</div>
+                  <div className="font-mono text-[10px] text-slate-500">{restaurant.billing?.upiId || 'palanikathirvel05@okaxis'}</div>
+                  <div className="text-[10px] text-slate-500 font-mono">
+                    GPay &bull; PhonePe &bull; Paytm &bull; BHIM
+                  </div>
+                </div>
               </div>
 
               {billedNotice && (

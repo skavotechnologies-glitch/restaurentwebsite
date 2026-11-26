@@ -61,6 +61,7 @@ export default function AdminOrdersPage() {
 
   // Modal 2: Dynamic Combined UPI QR Modal [Pay Bill]
   const [upiModalData, setUpiModalData] = useState(null);
+  const [modalQrMode, setModalQrMode] = useState('stand'); // 'stand' | 'dynamic'
 
   // Print state: single round KOT OR combined dining bill
   const [printData, setPrintData] = useState(null);
@@ -401,7 +402,7 @@ export default function AdminOrdersPage() {
     if (e) e.stopPropagation();
 
     const upiId = restaurant.billing?.upiId || 'palanikathirvel05@okaxis';
-    const payeeName = restaurant.billing?.upiPayeeName || restaurant.name || 'Naachi Café';
+    const payeeName = restaurant.billing?.upiPayeeName || 'Palani P.K__001';
     const note = `Bill ${customer.tableName} (${customer.orderNumbers.join(', ')})`;
 
     const upiUri = generateUpiUri({
@@ -409,7 +410,8 @@ export default function AdminOrdersPage() {
       payeeName,
       amount: customer.combinedTotal,
       transactionNote: note,
-      orderRef: customer.orderNumbers.join('-')
+      orderRef: customer.orderNumbers.join('-'),
+      aid: restaurant.billing?.upiAid || 'uGICAgMD27bClFw'
     });
 
     setUpiModalData({
@@ -988,16 +990,48 @@ export default function AdminOrdersPage() {
               </button>
             </div>
 
-            {/* Combined Dynamic UPI QR Code */}
-            <div className="p-4 bg-amber-50/50 rounded-2xl border-2 border-amber-200 inline-block">
-              <div className="p-3 bg-white rounded-xl shadow-inner border border-slate-200">
-                <QRCodeSVG
-                  value={upiModalData.upiUri}
-                  size={195}
-                  level="M"
-                  includeMargin={true}
-                />
-              </div>
+            {/* Mode switcher for cashier */}
+            <div className="flex items-center justify-center gap-1 p-1 bg-slate-100 rounded-xl max-w-xs mx-auto text-xs">
+              <button
+                type="button"
+                onClick={() => setModalQrMode('stand')}
+                className={`flex-1 py-1 px-2.5 rounded-lg font-bold transition text-[11px] ${
+                  modalQrMode === 'stand' ? 'bg-white text-forest-900 shadow-xs' : 'text-slate-600'
+                }`}
+              >
+                Official Stand QR
+              </button>
+              <button
+                type="button"
+                onClick={() => setModalQrMode('dynamic')}
+                className={`flex-1 py-1 px-2.5 rounded-lg font-bold transition text-[11px] ${
+                  modalQrMode === 'dynamic' ? 'bg-white text-forest-900 shadow-xs' : 'text-slate-600'
+                }`}
+              >
+                Auto-Amount QR
+              </button>
+            </div>
+
+            {/* Combined UPI QR Code Container */}
+            <div className="p-3 bg-amber-50/50 rounded-2xl border-2 border-amber-200 inline-block">
+              {modalQrMode === 'stand' ? (
+                <div className="p-1 bg-white rounded-xl shadow-inner border border-slate-200 max-w-[210px] mx-auto">
+                  <img
+                    src="/images/cafe-upi-qr.jpg"
+                    alt="Official Cafe Google Pay QR"
+                    className="w-full h-auto rounded-lg object-contain mx-auto"
+                  />
+                </div>
+              ) : (
+                <div className="p-3 bg-white rounded-xl shadow-inner border border-slate-200">
+                  <QRCodeSVG
+                    value={upiModalData.upiUri}
+                    size={195}
+                    level="M"
+                    includeMargin={true}
+                  />
+                </div>
+              )}
             </div>
 
             {/* Combined Bill Summary */}

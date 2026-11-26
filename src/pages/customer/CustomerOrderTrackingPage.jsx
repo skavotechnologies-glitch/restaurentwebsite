@@ -96,16 +96,20 @@ export default function CustomerOrderTrackingPage() {
   const isUpiOrder = activeRounds.some(o => o.paymentMethod === 'upi') || primaryOrder?.paymentMethod === 'upi';
   const upiRef = activeRounds.find(o => o.upiRef)?.upiRef || primaryOrder?.upiRef;
   const upiId = restaurant.billing?.upiId || 'palanikathirvel05@okaxis';
-  const upiPayeeName = restaurant.billing?.upiPayeeName || restaurant.name || 'Restaurant Owner';
+  const upiPayeeName = restaurant.billing?.upiPayeeName || 'Palani P.K__001';
+  const upiBankName = restaurant.billing?.upiBankName || 'Indian Overseas Bank 2679';
+  const upiQrImage = restaurant.billing?.upiQrImage || '/images/cafe-upi-qr.jpg';
 
   const upiUri = generateUpiUri({
     upiId,
     payeeName: upiPayeeName,
     amount: mergedTotal,
     transactionNote: `Table ${displayTable} Bill`,
-    orderRef: activeRounds[0]?.orderNumber || 'ORD-BILL'
+    orderRef: activeRounds[0]?.orderNumber || 'ORD-BILL',
+    aid: restaurant.billing?.upiAid || 'uGICAgMD27bClFw'
   });
   const [showUpiQr, setShowUpiQr] = useState(false);
+  const [qrMode, setQrMode] = useState('stand'); // 'stand' | 'dynamic'
 
   // Live countdown timer for the latest active round
   const latestRound = activeRounds[activeRounds.length - 1];
@@ -282,12 +286,52 @@ export default function CustomerOrderTrackingPage() {
               </a>
             </div>
             {showUpiQr && (
-              <div className="mt-3 p-4 bg-white rounded-2xl text-charcoal-900 space-y-2 animate-scale-up">
-                <div className="inline-block p-2 bg-white border border-purple-300 rounded-xl">
-                  <QRCodeSVG value={upiUri} size={140} level="M" />
+              <div className="mt-3 p-4 bg-white rounded-2xl text-charcoal-900 space-y-3 animate-scale-up">
+                <div className="flex items-center justify-center gap-1 p-0.5 bg-slate-100 rounded-lg max-w-xs mx-auto text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setQrMode('stand')}
+                    className={`flex-1 py-1 px-2 rounded font-bold transition text-[11px] ${
+                      qrMode === 'stand' ? 'bg-white text-purple-900 shadow-xs' : 'text-slate-600'
+                    }`}
+                  >
+                    Official GPay Stand
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQrMode('dynamic')}
+                    className={`flex-1 py-1 px-2 rounded font-bold transition text-[11px] ${
+                      qrMode === 'dynamic' ? 'bg-white text-purple-900 shadow-xs' : 'text-slate-600'
+                    }`}
+                  >
+                    Auto-Amount QR
+                  </button>
                 </div>
-                <div className="text-xs font-mono text-charcoal-600">
-                  UPI ID: <strong>{upiId}</strong>
+
+                {qrMode === 'stand' ? (
+                  <div className="inline-block p-1 bg-white border border-purple-200 rounded-xl shadow-xs max-w-[200px] overflow-hidden mx-auto">
+                    <img
+                      src={upiQrImage}
+                      alt="Official Cafe UPI QR"
+                      className="w-full h-auto rounded-lg object-contain"
+                    />
+                  </div>
+                ) : (
+                  <div className="inline-block p-2 bg-white border border-purple-300 rounded-xl">
+                    <QRCodeSVG value={upiUri} size={140} level="M" />
+                  </div>
+                )}
+
+                <div className="text-xs space-y-0.5">
+                  <div className="font-semibold text-charcoal-800">
+                    Payee: <strong>{upiPayeeName}</strong>
+                  </div>
+                  <div className="text-[11px] font-mono text-charcoal-600">
+                    UPI ID: <strong>{upiId}</strong>
+                  </div>
+                  <div className="text-[10px] text-slate-500">
+                    {upiBankName}
+                  </div>
                 </div>
               </div>
             )}

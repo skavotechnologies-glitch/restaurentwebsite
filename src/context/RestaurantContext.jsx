@@ -33,6 +33,15 @@ export function RestaurantProvider({ children }) {
         if (!parsed.billing?.upiId || parsed.billing?.upiId === 'naachicafe@okaxis') {
           parsed.billing = { ...parsed.billing, upiId: 'palanikathirvel05@okaxis' };
         }
+        if (!parsed.billing?.upiPayeeName || parsed.billing?.upiPayeeName === 'Naachi Café') {
+          parsed.billing = {
+            ...parsed.billing,
+            upiPayeeName: 'Palani P.K__001',
+            upiBankName: 'Indian Overseas Bank 2679',
+            upiAid: 'uGICAgMD27bClFw',
+            upiQrImage: '/images/cafe-upi-qr.jpg'
+          };
+        }
         return parsed;
       } catch (e) {}
     }
