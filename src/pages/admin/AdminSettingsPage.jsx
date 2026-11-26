@@ -14,7 +14,8 @@ import {
   Sparkles,
   UtensilsCrossed,
   ShieldCheck,
-  CheckCircle2
+  CheckCircle2,
+  Printer
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 
@@ -54,6 +55,7 @@ export default function AdminSettingsPage() {
     gstin: restaurant.billing?.gstin || '',
     upiId: restaurant.billing?.upiId || 'naachicafe@okaxis',
     upiPayeeName: restaurant.billing?.upiPayeeName || restaurant.name || 'Naachi Café',
+    autoPrintCashOrders: restaurant.billing?.autoPrintCashOrders !== false,
     billFooterMessage: restaurant.billing?.billFooterMessage || 'Thank you for dining with us! Please visit again.'
   });
 
@@ -88,6 +90,7 @@ export default function AdminSettingsPage() {
         gstin: formData.gstin.trim(),
         upiId: formData.upiId.trim(),
         upiPayeeName: formData.upiPayeeName.trim(),
+        autoPrintCashOrders: formData.autoPrintCashOrders,
         billFooterMessage: formData.billFooterMessage.trim()
       }
     };
@@ -432,6 +435,31 @@ export default function AdminSettingsPage() {
                 placeholder="e.g. Naachi Café"
                 className="w-full px-3 py-2 text-sm bg-slate-50 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-forest-600 font-semibold"
               />
+            </div>
+
+            <div className="col-span-full p-3.5 bg-forest-50/70 border border-forest-200 rounded-xl flex items-center justify-between">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-lg bg-forest-700 text-white flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Printer className="w-4 h-4" />
+                </div>
+                <div>
+                  <span className="text-xs font-bold text-forest-900 block">
+                    Auto-Print Cash on Delivery Bills to Billing Printer
+                  </span>
+                  <span className="text-[11px] text-charcoal-600 block">
+                    Automatically trigger the thermal billing printer for KOT &amp; bill as soon as a customer orders with Cash on Delivery / Pay at Counter.
+                  </span>
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer ml-4">
+                <input 
+                  type="checkbox"
+                  checked={formData.autoPrintCashOrders}
+                  onChange={(e) => setFormData({ ...formData, autoPrintCashOrders: e.target.checked })}
+                  className="sr-only peer"
+                />
+                <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-forest-700"></div>
+              </label>
             </div>
 
             <div className="col-span-full">

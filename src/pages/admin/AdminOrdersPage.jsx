@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import { QRCodeSVG } from 'qrcode.react';
 import { Link } from 'react-router-dom';
 import { 
@@ -7,7 +7,7 @@ import {
   Clock, 
   Receipt, 
   Printer, 
-  Phone,
+  Phone, 
   QrCode, 
   Check, 
   X, 
@@ -20,7 +20,10 @@ import {
   Users,
   CheckCircle,
   Layers,
-  ArrowRight
+  ArrowRight,
+  Banknote,
+  Smartphone,
+  ShieldCheck
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { formatCurrency, formatTime, formatDateTime } from '../../utils/formatters';
@@ -64,6 +67,80 @@ export default function AdminOrdersPage() {
 
   // Notification toast on settling an order
   const [settledToast, setSettledToast] = useState(null);
+
+  // Auto-Print Toggle (Cash on Delivery orders trigger automatic printing on billing printer)
+  const [autoPrintEnabled, setAutoPrintEnabled] = useState(() => {
+    return restaurant.billing?.autoPrintCashOrders !== false;
+  });
+  const autoPrintedOrderIdsRef = useRef(new Set());
+
+  // Listen for newly placed orders broadcasted by customer
+  useEffect(() => {
+    const handleOrderArrival = (e) => {
+      const order = e.detail?.order;
+      if (!order || !autoPrintEnabled) return;
+
+      // Auto-print Cash on Delivery orders (or if auto-print is explicitly requested)
+      if (order.paymentMethod === 'cash' || order.autoPrintRequested) {
+        if (autoPrintedOrderIdsRef.current.has(order.id)) return;
+        autoPrintedOrderIdsRef.current.add(order.id);
+
+        markOrderBilled(order.id);
+        const bill = generateBill(order.id);
+        setPrintData({
+          type: 'kot',
+          roundNumber: 1,
+          order,
+          tableName: order.tableName,
+          customerName: order.customerName,
+          bill
+        });
+
+        setSettledToast({
+          title: `🖨️ Auto-Printed Bill & KOT`,
+          message: `${order.tableName} • ${order.customerName} • Cash on Delivery`
+        });
+
+        setTimeout(() => {
+          window.print();
+        }, 300);
+      }
+    };
+
+    window.addEventListener('qr_new_order_placed', handleOrderArrival);
+    return () => window.removeEventListener('qr_new_order_placed', handleOrderArrival);
+  }, [autoPrintEnabled, markOrderBilled, generateBill]);
+
+  // Also auto-print recently arrived Cash orders that were loaded via database/state sync
+  useEffect(() => {
+    if (!autoPrintEnabled) return;
+    orders.forEach(order => {
+      if (order.isPaid || order.isBilled) return;
+      if (order.paymentMethod === 'cash' || order.autoPrintRequested) {
+        const ageInMs = Date.now() - new Date(order.createdAt || 0).getTime();
+        if (ageInMs < 20000 && !autoPrintedOrderIdsRef.current.has(order.id)) {
+          autoPrintedOrderIdsRef.current.add(order.id);
+          markOrderBilled(order.id);
+          const bill = generateBill(order.id);
+          setPrintData({
+            type: 'kot',
+            roundNumber: 1,
+            order,
+            tableName: order.tableName,
+            customerName: order.customerName,
+            bill
+          });
+          setSettledToast({
+            title: `🖨️ Auto-Printed Bill & KOT`,
+            message: `${order.tableName} • ${order.customerName} • Cash on Delivery`
+          });
+          setTimeout(() => {
+            window.print();
+          }, 300);
+        }
+      }
+    });
+  }, [orders, autoPrintEnabled, markOrderBilled, generateBill]);
 
   const currency = restaurant.billing?.currency || '₹';
 
@@ -392,6 +469,20 @@ export default function AdminOrdersPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setAutoPrintEnabled(!autoPrintEnabled)}
+            className={`px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1.5 shadow-sm border ${
+              autoPrintEnabled 
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100' 
+                : 'bg-slate-100 text-slate-600 border-slate-300 hover:bg-slate-200'
+            }`}
+            title="Toggle automatic thermal printing when Cash on Delivery orders arrive"
+          >
+            <Printer className={`w-3.5 h-3.5 ${autoPrintEnabled ? 'text-emerald-700' : 'text-slate-500'}`} />
+            <span>Auto-Print: {autoPrintEnabled ? 'ON' : 'OFF'}</span>
+          </button>
+
           {activeUnpaidOrders.length > 0 && (
             <button
               type="button"
@@ -568,13 +659,16 @@ export default function AdminOrdersPage() {
                 ) : (
                   <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
                     {customers.map(customer => {
+                      const isUpiPayment = customer.rounds.some(r => r.paymentMethod === 'upi');
+                      const upiRef = customer.rounds.find(r => r.upiRef)?.upiRef;
+
                       return (
                         <div 
                           key={customer.customerKey}
                           className="border border-slate-300 rounded-2xl p-4 bg-slate-50/50 flex flex-col justify-between space-y-3 shadow-xs hover:border-slate-400 transition"
                         >
                           <div>
-                            {/* Card Header: Customer Name (and phone) */}
+                            {/* Card Header: Customer Name, Phone & Payment Method Badge */}
                             <div className="flex items-center justify-between border-b border-slate-200 pb-2 mb-2.5">
                               <div>
                                 <span className="text-[10px] text-charcoal-400 uppercase tracking-wider font-semibold block">
@@ -584,15 +678,34 @@ export default function AdminOrdersPage() {
                                   {customer.customerName}
                                 </h3>
                                 {customer.customerPhone && (
-                                  <span className="text-[11px] text-charcoal-500 font-mono">
+                                  <span className="text-[11px] text-charcoal-500 font-mono block">
                                     {customer.customerPhone}
                                   </span>
                                 )}
+                                {upiRef && (
+                                  <div className="mt-1 inline-flex items-center gap-1 text-[10px] font-mono text-purple-800 bg-purple-50 px-1.5 py-0.5 rounded border border-purple-200">
+                                    <ShieldCheck className="w-3 h-3 text-purple-600" />
+                                    <span>UTR: {upiRef}</span>
+                                  </div>
+                                )}
                               </div>
 
-                              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-forest-100 text-forest-800 border border-forest-200 self-start">
-                                {customer.roundCount} {customer.roundCount === 1 ? 'Round' : 'Rounds'}
-                              </span>
+                              <div className="flex flex-col items-end gap-1">
+                                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-forest-100 text-forest-800 border border-forest-200 self-end">
+                                  {customer.roundCount} {customer.roundCount === 1 ? 'Round' : 'Rounds'}
+                                </span>
+                                {isUpiPayment ? (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-purple-100 text-purple-800 border border-purple-200 flex items-center gap-1">
+                                    <Smartphone className="w-3 h-3 text-purple-700" />
+                                    <span>UPI to Owner</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-800 border border-emerald-200 flex items-center gap-1">
+                                    <Banknote className="w-3 h-3 text-emerald-700" />
+                                    <span>Cash on Counter</span>
+                                  </span>
+                                )}
+                              </div>
                             </div>
 
                             {/* ROUNDS LIST (round 1, round 2, etc.) */}
@@ -618,6 +731,15 @@ export default function AdminOrdersPage() {
                                         <span className="text-[10px] font-mono text-charcoal-500">
                                           ({round.orderNumber})
                                         </span>
+                                        {round.paymentMethod === 'upi' ? (
+                                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-purple-100 text-purple-800 rounded">
+                                            UPI
+                                          </span>
+                                        ) : (
+                                          <span className="text-[9px] font-bold px-1.5 py-0.5 bg-emerald-100 text-emerald-800 rounded">
+                                            Cash
+                                          </span>
+                                        )}
                                       </div>
 
                                       <span className="font-serif font-bold text-charcoal-900">
@@ -924,6 +1046,14 @@ export default function AdminOrdersPage() {
             <div>
               Guest: {printData.customerName || printData.order?.customerName} 
             </div>
+            <div className="font-bold">
+              Payment: {printData.order?.paymentMethod === 'upi' ? `ONLINE UPI (To Owner: ${restaurant.billing?.upiId || 'naachicafe@okaxis'})` : 'CASH ON DELIVERY (COLLECT AT DESK)'}
+            </div>
+            {printData.order?.upiRef && (
+              <div>
+                UPI UTR / Ref: {printData.order?.upiRef}
+              </div>
+            )}
           </div>
 
           <div className="py-2 border-b border-dashed border-black">

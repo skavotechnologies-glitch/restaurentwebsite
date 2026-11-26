@@ -223,7 +223,11 @@ export function RestaurantProvider({ children }) {
     tableId,
     tableName,
     items,
-    specialInstructions = ''
+    specialInstructions = '',
+    paymentMethod = 'cash',
+    paymentStatus = null,
+    upiRef = '',
+    upiDetails = null
   }) => {
     if (!items || items.length === 0) {
       throw new Error('Your cart is empty.');
@@ -337,6 +341,18 @@ export function RestaurantProvider({ children }) {
       // Reception billing indicator
       isBilled: false,
       billedAt: null,
+
+      // Payment details (Option B: Cash on Delivery or Direct Owner UPI)
+      paymentMethod: paymentMethod || 'cash',
+      paymentStatus: paymentStatus || (paymentMethod === 'upi' ? 'pending_verification' : 'unpaid'),
+      upiRef: upiRef ? upiRef.trim() : '',
+      upiDetails: upiDetails || (paymentMethod === 'upi' ? {
+        upiId: billingConfig.upiId || 'naachicafe@okaxis',
+        payeeName: billingConfig.upiPayeeName || restaurant.name || 'Restaurant Owner',
+        amount: grandTotal,
+        upiRef: upiRef ? upiRef.trim() : ''
+      } : null),
+      autoPrintRequested: paymentMethod === 'cash',
       
       specialInstructions: specialInstructions.trim(),
       createdAt: now.toISOString(),
@@ -557,6 +573,9 @@ export function RestaurantProvider({ children }) {
       estimatedWaitTime: Math.max(...matchingOrders.map(o => o.estimatedWaitTime || 10)),
       isBilled: matchingOrders.every(o => o.isBilled),
       billedAt: primaryOrder.billedAt,
+      paymentMethod: primaryOrder.paymentMethod || 'cash',
+      paymentStatus: primaryOrder.paymentStatus || 'unpaid',
+      upiRef: primaryOrder.upiRef || '',
       date: primaryOrder.createdAt,
       generatedAt: new Date().toISOString()
     };

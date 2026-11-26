@@ -9,11 +9,18 @@ import {
   CheckCircle2,
   ShoppingBag,
   Layers,
-  ChevronRight
+  ChevronRight,
+  Banknote,
+  Smartphone,
+  ShieldCheck,
+  QrCode,
+  Printer
 } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { useCart } from '../../context/CartContext';
 import { formatCurrency, formatTime } from '../../utils/formatters';
+import { generateUpiUri } from '../../utils/upi';
 
 export default function CustomerOrderTrackingPage() {
   const { orderId } = useParams();
@@ -84,6 +91,21 @@ export default function CustomerOrderTrackingPage() {
   // Reference details (Table & Customer name)
   const displayTable = activeRounds[0]?.tableName || customerSessionOrders[0]?.tableName || directOrder?.tableName || 'Your Table';
   const displayCustomer = activeRounds[0]?.customerName || customerSessionOrders[0]?.customerName || directOrder?.customerName || 'Guest';
+
+  const primaryOrder = activeRounds[0] || customerSessionOrders[0] || directOrder;
+  const isUpiOrder = activeRounds.some(o => o.paymentMethod === 'upi') || primaryOrder?.paymentMethod === 'upi';
+  const upiRef = activeRounds.find(o => o.upiRef)?.upiRef || primaryOrder?.upiRef;
+  const upiId = restaurant.billing?.upiId || 'naachicafe@okaxis';
+  const upiPayeeName = restaurant.billing?.upiPayeeName || restaurant.name || 'Restaurant Owner';
+
+  const upiUri = generateUpiUri({
+    upiId,
+    payeeName: upiPayeeName,
+    amount: mergedTotal,
+    transactionNote: `Table ${displayTable} Bill`,
+    orderRef: activeRounds[0]?.orderNumber || 'ORD-BILL'
+  });
+  const [showUpiQr, setShowUpiQr] = useState(false);
 
   // Live countdown timer for the latest active round
   const latestRound = activeRounds[activeRounds.length - 1];
@@ -223,19 +245,75 @@ export default function CustomerOrderTrackingPage() {
       </header>
 
       <main className="max-w-md mx-auto px-4 py-4 space-y-4">
-        {/* TOTAL AMOUNT TO PAY AT COUNTER (Merged Round 1 + Round 2) */}
-        <div className="bg-gradient-to-br from-forest-800 to-forest-900 text-white rounded-2xl p-6 shadow-elevated text-center space-y-2">
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mx-auto mb-1 bg-white/10 text-forest-200 uppercase tracking-wider">
-            Total Amount to Pay at Counter
+        {/* PAYMENT DETAILS BANNER (Option B: Cash on Delivery or Direct Owner UPI) */}
+        {isUpiOrder ? (
+          <div className="bg-gradient-to-br from-purple-800 to-indigo-900 text-white rounded-2xl p-6 shadow-elevated text-center space-y-2.5">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mx-auto mb-1 bg-white/10 text-purple-200 uppercase tracking-wider">
+              <Smartphone className="w-3.5 h-3.5" />
+              <span>Online UPI Payment (Direct to Owner)</span>
+            </div>
+            <div className="font-serif font-bold text-4xl text-gold-300">
+              {formatCurrency(mergedTotal, currency)}
+            </div>
+            <p className="text-xs text-purple-100/90 max-w-xs mx-auto">
+              Paid directly to <strong>{upiPayeeName}</strong> ({upiId}).
+            </p>
+            {upiRef && (
+              <div className="inline-flex items-center gap-1.5 text-xs font-mono bg-purple-950/70 text-purple-200 px-3 py-1 rounded-xl border border-purple-700/60">
+                <ShieldCheck className="w-4 h-4 text-gold-400" />
+                <span>UTR: {upiRef}</span>
+              </div>
+            )}
+            <div className="pt-1 flex justify-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowUpiQr(!showUpiQr)}
+                className="px-3 py-1.5 bg-white/15 hover:bg-white/20 rounded-xl text-xs font-bold text-white transition flex items-center gap-1.5"
+              >
+                <QrCode className="w-3.5 h-3.5" />
+                <span>{showUpiQr ? 'Hide UPI QR' : 'Show UPI QR'}</span>
+              </button>
+              <a
+                href={upiUri}
+                className="px-3 py-1.5 bg-gold-400 hover:bg-gold-500 rounded-xl text-xs font-bold text-charcoal-900 transition flex items-center gap-1.5"
+              >
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Open UPI App</span>
+              </a>
+            </div>
+            {showUpiQr && (
+              <div className="mt-3 p-4 bg-white rounded-2xl text-charcoal-900 space-y-2 animate-scale-up">
+                <div className="inline-block p-2 bg-white border border-purple-300 rounded-xl">
+                  <QRCodeSVG value={upiUri} size={140} level="M" />
+                </div>
+                <div className="text-xs font-mono text-charcoal-600">
+                  UPI ID: <strong>{upiId}</strong>
+                </div>
+              </div>
+            )}
+            <div className="text-[11px] text-purple-200/80 pt-1">
+              Status: <span className="font-bold text-gold-300">Verification Pending at Counter</span>
+            </div>
           </div>
-          <div className="font-serif font-bold text-4xl text-gold-400">
-            {formatCurrency(mergedTotal, currency)}
+        ) : (
+          <div className="bg-gradient-to-br from-forest-800 to-forest-900 text-white rounded-2xl p-6 shadow-elevated text-center space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mx-auto mb-1 bg-white/10 text-forest-200 uppercase tracking-wider">
+              <Banknote className="w-3.5 h-3.5" />
+              <span>Cash on Delivery / Pay at Counter</span>
+            </div>
+            <div className="font-serif font-bold text-4xl text-gold-400">
+              {formatCurrency(mergedTotal, currency)}
+            </div>
+            <p className="text-xs text-forest-100/90 max-w-xs mx-auto">
+              {activeRounds.length > 1 ? `Includes all dishes from Round 1 and Round 2. ` : ''}
+              Show this screen at the counter when you finish dining. Pay via Cash, UPI, or Card.
+            </p>
+            <div className="inline-flex items-center gap-1.5 text-[11px] text-forest-200 bg-forest-950/50 px-2.5 py-1 rounded-lg border border-forest-700/50">
+              <Printer className="w-3 h-3 text-gold-400" />
+              <span>KOT &amp; Bill sent to counter billing printer</span>
+            </div>
           </div>
-          <p className="text-xs text-forest-100/90 max-w-xs mx-auto">
-            {activeRounds.length > 1 ? `Includes all dishes from Round 1 and Round 2. ` : ''}
-            Show this screen at the counter when you finish dining. Pay via Cash, UPI, or Card.
-          </p>
-        </div>
+        )}
 
         {/* Kitchen Countdown Timer (for latest round in preparation) */}
         <div className="bg-white rounded-2xl p-4 border border-cream-200 shadow-soft text-center space-y-2">

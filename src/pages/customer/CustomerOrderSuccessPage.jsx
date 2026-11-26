@@ -10,7 +10,11 @@ import {
   ShoppingBag,
   User,
   Phone,
-  AlertCircle
+  AlertCircle,
+  Banknote,
+  Smartphone,
+  ShieldCheck,
+  Printer
 } from 'lucide-react';
 import { useRestaurant } from '../../context/RestaurantContext';
 import { formatCurrency } from '../../utils/formatters';
@@ -102,18 +106,47 @@ export default function CustomerOrderSuccessPage() {
             </span>
           </div>
 
-          {/* Pay at Counter Callout */}
-          <div className="p-4 bg-gradient-to-br from-forest-800 to-forest-900 text-white rounded-2xl text-center space-y-1 shadow-md">
-            <span className="text-[11px] text-forest-200 font-semibold uppercase tracking-wider block">
-              Bill Amount to Pay at Counter
-            </span>
-            <div className="font-serif font-bold text-3xl sm:text-4xl text-gold-400">
-              {formatCurrency(order.total, currency)}
+          {/* Payment Method Details Banner */}
+          {order.paymentMethod === 'upi' ? (
+            <div className="p-4 bg-gradient-to-br from-purple-800 to-indigo-900 text-white rounded-2xl text-center space-y-2 shadow-md">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mx-auto bg-white/10 text-purple-200 uppercase tracking-wider">
+                <Smartphone className="w-3.5 h-3.5" />
+                <span>Online UPI Payment (Direct to Owner)</span>
+              </div>
+              <div className="font-serif font-bold text-3xl sm:text-4xl text-gold-300">
+                {formatCurrency(order.total, currency)}
+              </div>
+              <p className="text-[11px] text-purple-100/90 max-w-xs mx-auto">
+                Payment sent to <strong>{order.upiDetails?.payeeName || 'Restaurant Owner'}</strong> ({order.upiDetails?.upiId || restaurant.billing?.upiId || 'naachicafe@okaxis'}).
+              </p>
+              {order.upiRef && (
+                <div className="inline-flex items-center gap-1 text-[11px] font-mono bg-purple-950/60 text-purple-200 px-2.5 py-1 rounded-lg border border-purple-700/50">
+                  <ShieldCheck className="w-3.5 h-3.5 text-gold-400" />
+                  <span>UTR: {order.upiRef}</span>
+                </div>
+              )}
+              <div className="text-[10px] text-purple-200/80 pt-1">
+                Status: <span className="font-bold text-gold-300">Pending Counter Verification</span> &bull; Safe &amp; Direct
+              </div>
             </div>
-            <p className="text-[11px] text-forest-100/90 pt-1">
-              Show this bill at the counter after your meal. Pay via UPI, Cash, or Card.
-            </p>
-          </div>
+          ) : (
+            <div className="p-4 bg-gradient-to-br from-forest-800 to-forest-900 text-white rounded-2xl text-center space-y-2 shadow-md">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-bold mx-auto bg-white/10 text-forest-200 uppercase tracking-wider">
+                <Banknote className="w-3.5 h-3.5" />
+                <span>Cash on Delivery / Pay at Counter</span>
+              </div>
+              <div className="font-serif font-bold text-3xl sm:text-4xl text-gold-400">
+                {formatCurrency(order.total, currency)}
+              </div>
+              <p className="text-[11px] text-forest-100/90 max-w-xs mx-auto">
+                Please pay this amount at the counter when you finish dining. Pay via Cash, UPI, or Card.
+              </p>
+              <div className="inline-flex items-center gap-1.5 text-[10px] text-forest-200 bg-forest-950/50 px-2.5 py-1 rounded-lg border border-forest-700/50">
+                <Printer className="w-3 h-3 text-gold-400" />
+                <span>KOT &amp; bill sent to counter billing printer</span>
+              </div>
+            </div>
+          )}
 
           {/* Waiting Time Notice */}
           <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center justify-between text-xs">
